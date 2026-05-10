@@ -1,0 +1,45 @@
+version: '3'
+services:
+  php_skripsi:
+    build: ./php
+    image: php:latest
+    container_name: php_skripsi
+    hostname: "php"
+    volumes:
+      - ./src_2:/var/www/html
+      - ./php/www.conf:/usr/local/etc/php-fpm.d/www.conf
+    working_dir: /var/www/html
+    depends_on: 
+      - db_skripsi
+
+  db_skripsi:
+    image: mariadb:10.2
+    container_name: db_skripsi
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "43106:3306"
+    volumes:
+      - ./db/data:/var/lib/mysql
+      - ./db/conf.d:/etc/mysql/conf.d:ro
+    environment:
+      MYSQL_USER: root
+      MYSQL_PASSWORD: 123
+      MYSQL_ROOT_PASSWORD: 123
+      TZ: Asia/Jakarta
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql  
+    read_only: false
+
+  nginx_skripsi:
+    build: ./nginx
+    image: nginx:latest
+    container_name: nginx_skripsi
+    hostname: "nginx"
+    ports:
+      - "49:80"
+    volumes:
+      - ./src_2:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php_skripsi
