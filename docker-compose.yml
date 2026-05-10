@@ -1,0 +1,13 @@
+services:
+  tourhub-fastapi:
+    build: .
+    container_name: tourhub-bali-fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+    environment:
+      DATA_PATH: /app/data/bali_tourist_destination.csv
+      ENABLE_BMKG: "true"
+    restart: unless-stopped
