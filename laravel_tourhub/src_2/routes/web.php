@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\User\UserDashboardController;
 use App\Http\Controllers\Web\RecommendationController;
-use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
-
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('auth.login');

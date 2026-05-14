@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
-use Throwable;
-use RuntimeException;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use App\Http\Controllers\Controller;
 use App\Models\RecommendationLog;
-use Illuminate\Http\JsonResponse;
 use App\Services\TourHubMlService;
 use Illuminate\Contracts\View\View;
-use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\View as ViewFacade;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Throwable;
 
 final class RecommendationController extends Controller
 {
@@ -156,7 +156,7 @@ final class RecommendationController extends Controller
      * Jika use_bmkg = true dan bmkg_adm4 kosong,
      * sistem otomatis mencari ADM4 berdasarkan kabupaten/kota + kecamatan.
      *
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      *
      * @throws ValidationException
@@ -211,7 +211,7 @@ final class RecommendationController extends Controller
      * 5. Scan kandidat ADM4 umum dari ADM3.
      * 6. Fallback terakhir ke Ubud agar tidak error.
      *
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function resolveBmkgAdm4(array $validated): ?string
     {
@@ -344,7 +344,7 @@ final class RecommendationController extends Controller
             'kota denpasar|denpasar utara' => '51.71.04.1001',
         ];
 
-        $key = $kabupatenKota . '|' . $kecamatan;
+        $key = $kabupatenKota.'|'.$kecamatan;
 
         return $map[$key] ?? null;
     }
@@ -527,7 +527,7 @@ final class RecommendationController extends Controller
             'kota denpasar|denpasar utara' => '51.71.04',
         ];
 
-        $key = $kabupatenKota . '|' . $kecamatan;
+        $key = $kabupatenKota.'|'.$kecamatan;
 
         if (isset($map[$key])) {
             return $map[$key];
@@ -556,10 +556,10 @@ final class RecommendationController extends Controller
     private function resolveFirstAdm4FromBmkgAdm3(string $adm3): ?string
     {
         return Cache::remember(
-            key: 'bmkg_adm4_from_adm3_' . str_replace('.', '_', $adm3),
+            key: 'bmkg_adm4_from_adm3_'.str_replace('.', '_', $adm3),
             ttl: now()->addDays(30),
             callback: function () use ($adm3): ?string {
-                $url = 'https://www.bmkg.go.id/cuaca/prakiraan-cuaca/' . $adm3;
+                $url = 'https://www.bmkg.go.id/cuaca/prakiraan-cuaca/'.$adm3;
 
                 try {
                     $response = Http::timeout(15)
@@ -602,7 +602,7 @@ final class RecommendationController extends Controller
     private function resolveAdm4ByCandidateScan(string $adm3): ?string
     {
         return Cache::remember(
-            key: 'bmkg_adm4_scan_' . str_replace('.', '_', $adm3),
+            key: 'bmkg_adm4_scan_'.str_replace('.', '_', $adm3),
             ttl: now()->addDays(30),
             callback: function () use ($adm3): ?string {
                 foreach ($this->buildCommonAdm4Candidates($adm3) as $adm4) {
@@ -641,7 +641,7 @@ final class RecommendationController extends Controller
         }
 
         return array_map(
-            fn (string $suffix): string => $adm3 . '.' . $suffix,
+            fn (string $suffix): string => $adm3.'.'.$suffix,
             $suffixes
         );
     }
@@ -654,7 +654,7 @@ final class RecommendationController extends Controller
     private function isValidBmkgAdm4(string $adm4): bool
     {
         return Cache::remember(
-            key: 'bmkg_adm4_valid_' . str_replace('.', '_', $adm4),
+            key: 'bmkg_adm4_valid_'.str_replace('.', '_', $adm4),
             ttl: now()->addDays(30),
             callback: function () use ($adm4): bool {
                 try {
@@ -690,8 +690,8 @@ final class RecommendationController extends Controller
     /**
      * Simpan log jika request ke FastAPI berhasil.
      *
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $result
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $result
      */
     private function storeSuccessLog(array $payload, array $result, int $responseTimeMs): void
     {
@@ -711,7 +711,7 @@ final class RecommendationController extends Controller
     /**
      * Simpan log jika request ke FastAPI gagal.
      *
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function storeFailedLog(array $payload, string $errorMessage, int $responseTimeMs): void
     {
@@ -745,7 +745,7 @@ final class RecommendationController extends Controller
         }
 
         return collect(explode(',', $keywords))
-            ->map(fn (string $keyword): string => trim($keyword))
+            ->map(fn (string $keyword): string => mb_trim($keyword))
             ->filter()
             ->values()
             ->all();
@@ -757,7 +757,7 @@ final class RecommendationController extends Controller
             return null;
         }
 
-        $value = trim((string) $value);
+        $value = mb_trim((string) $value);
 
         return $value === '' ? null : $value;
     }
@@ -782,7 +782,7 @@ final class RecommendationController extends Controller
             return '';
         }
 
-        $value = mb_strtolower(trim((string) $value));
+        $value = mb_strtolower(mb_trim((string) $value));
 
         $value = str_replace(
             ['.', ',', ';', ':'],
@@ -810,7 +810,7 @@ final class RecommendationController extends Controller
 
         $value = preg_replace('/\s+/', ' ', $value) ?: '';
 
-        return trim($value);
+        return mb_trim($value);
     }
 
     /**
@@ -840,7 +840,7 @@ final class RecommendationController extends Controller
         ];
 
         if (in_array($value, $regencies, true)) {
-            return 'kabupaten ' . $value;
+            return 'kabupaten '.$value;
         }
 
         return $value;
@@ -850,7 +850,7 @@ final class RecommendationController extends Controller
     {
         if (! ViewFacade::exists(self::VIEW_PATH)) {
             throw new RuntimeException(
-                'View ' . self::VIEW_PATH . ' tidak ditemukan. Buat file: resources/views/tourhub/recommendation/index.blade.php'
+                'View '.self::VIEW_PATH.' tidak ditemukan. Buat file: resources/views/tourhub/recommendation/index.blade.php'
             );
         }
     }

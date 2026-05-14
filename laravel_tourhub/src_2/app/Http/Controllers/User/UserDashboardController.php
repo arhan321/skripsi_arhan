@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\User;
 
+use App\Http\Controllers\Controller;
 use App\Models\RecommendationLog;
 use Illuminate\Contracts\View\View;
-use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 
 final class UserDashboardController extends Controller

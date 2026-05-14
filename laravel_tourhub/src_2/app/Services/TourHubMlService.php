@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
@@ -7,13 +9,13 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-class TourHubMlService
+final class TourHubMlService
 {
     public function __construct(
-        protected ?string $baseUrl = null,
-        protected ?int $timeout = null,
+        private ?string $baseUrl = null,
+        private ?int $timeout = null,
     ) {
-        $this->baseUrl = rtrim($baseUrl ?: config('tourhub.ml_base_url'), '/');
+        $this->baseUrl = mb_rtrim($baseUrl ?: config('tourhub.ml_base_url'), '/');
         $this->timeout = $timeout ?: (int) config('tourhub.ml_timeout', 30);
     }
 
@@ -37,25 +39,25 @@ class TourHubMlService
         return $this->request('post', '/recommend', $payload);
     }
 
-    protected function request(string $method, string $endpoint, array $data = []): array
+    private function request(string $method, string $endpoint, array $data = []): array
     {
         try {
             $client = Http::timeout($this->timeout)->acceptJson()->asJson();
-            $url = $this->baseUrl . $endpoint;
+            $url = $this->baseUrl.$endpoint;
 
-            $response = match (strtolower($method)) {
+            $response = match (mb_strtolower($method)) {
                 'get' => $client->get($url, $data),
                 'post' => $client->post($url, $data),
                 default => throw new RuntimeException("Unsupported HTTP method: {$method}"),
             };
 
             if ($response->failed()) {
-                throw new RuntimeException("ML API error HTTP {$response->status()}: " . $response->body());
+                throw new RuntimeException("ML API error HTTP {$response->status()}: ".$response->body());
             }
 
             return $response->json() ?? [];
         } catch (ConnectionException|RequestException $e) {
-            throw new RuntimeException('Gagal terhubung ke ML API: ' . $e->getMessage(), 0, $e);
+            throw new RuntimeException('Gagal terhubung ke ML API: '.$e->getMessage(), 0, $e);
         }
     }
 }

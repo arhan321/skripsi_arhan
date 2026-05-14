@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Admin\Resources\RecommendationLogs;
 
 use App\Filament\Admin\Resources\RecommendationLogs\Pages\ListRecommendationLogs;
@@ -13,13 +15,13 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use UnitEnum;
 
-class RecommendationLogResource extends Resource
+final class RecommendationLogResource extends Resource
 {
     protected static ?string $model = RecommendationLog::class;
 
-    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static string | UnitEnum | null $navigationGroup = 'TourHub';
+    protected static string|UnitEnum|null $navigationGroup = 'TourHub';
 
     protected static ?string $navigationLabel = 'Log Rekomendasi';
 

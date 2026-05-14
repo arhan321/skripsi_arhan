@@ -11,20 +11,23 @@
         $latestCandidates = $latestSuccess?->total_candidates ?? 0;
         $latestTopDestination = $latestSuccess?->top_destination_name ?? '-';
 
-        $successRate = $totalRecommendations > 0
-            ? round(($successRecommendations / $totalRecommendations) * 100)
-            : 0;
+        $successRate =
+            $totalRecommendations > 0 ? round(($successRecommendations / $totalRecommendations) * 100) : 0;
     @endphp
 
     <div class="space-y-6">
         {{-- Hero Section --}}
-        <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 md:p-8 shadow-sm">
-            <div class="absolute right-0 top-0 h-40 w-40 rounded-full bg-blue-500/20 blur-3xl"></div>
+        <section
+            class="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 shadow-sm md:p-8"
+        >
+            <div class="absolute top-0 right-0 h-40 w-40 rounded-full bg-blue-500/20 blur-3xl"></div>
             <div class="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-emerald-500/20 blur-3xl"></div>
 
             <div class="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div class="max-w-2xl">
-                    <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200 ring-1 ring-white/10">
+                    <div
+                        class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200 ring-1 ring-white/10"
+                    >
                         <span>👋</span>
                         <span>Panel User TourHub Bali</span>
                     </div>
@@ -34,20 +37,14 @@
                     </h1>
 
                     <p class="mt-3 text-sm leading-6 text-slate-300 md:text-base">
-                        Di dashboard ini kamu bisa melihat ringkasan pencarian wisata, riwayat rekomendasi,
-                        serta detail hasil rekomendasi yang sudah disimpan berdasarkan akun kamu.
+                        Di dashboard ini kamu bisa melihat ringkasan pencarian wisata, riwayat rekomendasi, serta detail
+                        hasil rekomendasi yang sudah disimpan berdasarkan akun kamu.
                     </p>
 
                     <div class="mt-5 flex flex-wrap gap-2 text-xs text-slate-300">
-                        <span class="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
-                            CBF + CARS
-                        </span>
-                        <span class="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
-                            BMKG Context
-                        </span>
-                        <span class="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
-                            Riwayat Per User
-                        </span>
+                        <span class="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">CBF + CARS</span>
+                        <span class="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">BMKG Context</span>
+                        <span class="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">Riwayat Per User</span>
                     </div>
                 </div>
 
@@ -85,14 +82,10 @@
                         <p class="mt-2 text-4xl font-bold text-slate-950">{{ $totalRecommendations }}</p>
                     </div>
 
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-2xl">
-                        📌
-                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-2xl">📌</div>
                 </div>
 
-                <p class="mt-4 text-xs text-slate-500">
-                    Total semua percobaan rekomendasi yang pernah kamu lakukan.
-                </p>
+                <p class="mt-4 text-xs text-slate-500">Total semua percobaan rekomendasi yang pernah kamu lakukan.</p>
             </div>
 
             <div class="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm">
@@ -102,14 +95,10 @@
                         <p class="mt-2 text-4xl font-bold text-emerald-600">{{ $successRecommendations }}</p>
                     </div>
 
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl">
-                        ✅
-                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl">✅</div>
                 </div>
 
-                <p class="mt-4 text-xs text-slate-500">
-                    Request yang berhasil mendapatkan response dari FastAPI ML.
-                </p>
+                <p class="mt-4 text-xs text-slate-500">Request yang berhasil mendapatkan response dari FastAPI ML.</p>
             </div>
 
             <div class="rounded-3xl border border-red-200 bg-white p-5 shadow-sm">
@@ -119,9 +108,7 @@
                         <p class="mt-2 text-4xl font-bold text-red-600">{{ $failedRecommendations }}</p>
                     </div>
 
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-2xl">
-                        ⚠️
-                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-2xl">⚠️</div>
                 </div>
 
                 <p class="mt-4 text-xs text-slate-500">
@@ -136,20 +123,16 @@
                         <p class="mt-2 text-4xl font-bold text-blue-600">{{ $successRate }}%</p>
                     </div>
 
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl">
-                        📈
-                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl">📈</div>
                 </div>
 
-                <p class="mt-4 text-xs text-slate-500">
-                    Persentase request berhasil dari total pencarian rekomendasi.
-                </p>
+                <p class="mt-4 text-xs text-slate-500">Persentase request berhasil dari total pencarian rekomendasi.</p>
             </div>
         </section>
 
         {{-- Latest Recommendation Summary --}}
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div class="xl:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p class="text-sm font-medium text-slate-500">Rekomendasi Terakhir</p>
@@ -217,9 +200,7 @@
             <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <p class="text-sm font-medium text-slate-500">Tips Pengujian</p>
 
-                <h2 class="mt-2 text-xl font-bold text-slate-950">
-                    Agar hasil tidak 0 candidates
-                </h2>
+                <h2 class="mt-2 text-xl font-bold text-slate-950">Agar hasil tidak 0 candidates</h2>
 
                 <ul class="mt-4 space-y-3 text-sm text-slate-600">
                     <li class="flex gap-2">
@@ -248,9 +229,7 @@
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-medium text-slate-500">Riwayat</p>
-                        <h2 class="text-xl font-bold text-slate-950">
-                            Riwayat Rekomendasi Saya
-                        </h2>
+                        <h2 class="text-xl font-bold text-slate-950">Riwayat Rekomendasi Saya</h2>
                         <p class="mt-1 text-sm text-slate-600">
                             Semua rekomendasi yang kamu cari akan tersimpan di sini.
                         </p>
@@ -268,7 +247,9 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr
+                            class="border-b border-slate-200 bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase"
+                        >
                             <th class="px-6 py-4">Waktu</th>
                             <th class="px-6 py-4">Status</th>
                             <th class="px-6 py-4">Parameter</th>
@@ -301,7 +282,9 @@
                                 </td>
 
                                 <td class="px-6 py-4">
-                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $log->status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                    <span
+                                        class="{{ $log->status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }} inline-flex rounded-full px-3 py-1 text-xs font-bold"
+                                    >
                                         {{ ucfirst($log->status) }}
                                     </span>
                                 </td>
@@ -316,7 +299,9 @@
 
                                     <div class="mt-2 flex flex-wrap gap-1">
                                         @foreach ((array) $categories as $category)
-                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                            <span
+                                                class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600"
+                                            >
                                                 {{ $category }}
                                             </span>
                                         @endforeach
@@ -358,17 +343,15 @@
                         @empty
                             <tr>
                                 <td colspan="8" class="px-6 py-12 text-center">
-                                    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-3xl">
+                                    <div
+                                        class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-3xl"
+                                    >
                                         🧭
                                     </div>
 
-                                    <h3 class="mt-4 text-lg font-bold text-slate-950">
-                                        Belum ada riwayat rekomendasi
-                                    </h3>
+                                    <h3 class="mt-4 text-lg font-bold text-slate-950">Belum ada riwayat rekomendasi</h3>
 
-                                    <p class="mt-2 text-sm text-slate-500">
-                                        Mulai cari rekomendasi wisata pertamamu.
-                                    </p>
+                                    <p class="mt-2 text-sm text-slate-500">Mulai cari rekomendasi wisata pertamamu.</p>
 
                                     <a
                                         href="{{ route('tourhub.recommendation.index') }}"
