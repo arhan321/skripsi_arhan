@@ -6,16 +6,17 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Filament\Panel;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 final class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, HasRoles, Notifiable, HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
