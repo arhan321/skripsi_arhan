@@ -145,6 +145,14 @@
                 $useBmkg = old('use_bmkg', data_get($payload ?? [], 'use_bmkg', false));
 
                 $selectedKategoriArray = (array) $selectedKategori;
+
+                /*
+                 * Keterangan periode BMKG untuk ditampilkan di UI.
+                 * BMKG data terbuka prakiraan cuaca tersedia dalam format 3 harian,
+                 * dengan 8 data per hari atau interval sekitar 3 jam.
+                 */
+                $bmkgForecastPeriodText = 'Prakiraan BMKG ±3 hari ke depan';
+                $bmkgForecastIntervalText = 'Update prakiraan per 3 jam';
             @endphp
 
             {{-- Top Navigation: Travel app style --}}
@@ -575,7 +583,8 @@
                                                         Gunakan BMKG
                                                     </span>
                                                     <span class="text-xs leading-5 text-slate-500">
-                                                        Ambil prakiraan cuaca otomatis berdasarkan wilayah.
+                                                        Ambil prakiraan cuaca otomatis berdasarkan wilayah
+                                                        untuk periode ±3 hari ke depan.
                                                     </span>
                                                 </span>
                                             </span>
@@ -631,6 +640,15 @@
                                                 User tidak perlu mengisi kode ADM4. Sistem akan menentukan ADM4 secara
                                                 otomatis dari lokasi yang dipilih.
                                             </p>
+
+                                            <div class="mt-3 rounded-2xl bg-blue-50 px-3 py-2 ring-1 ring-blue-100">
+                                                <p class="font-black text-blue-900">{{ $bmkgForecastPeriodText }}</p>
+                                                <p class="mt-1 text-[11px] leading-5 text-blue-700">
+                                                    Data prakiraan cuaca BMKG bersifat 3 harian dengan interval sekitar
+                                                    3 jam. Di sistem ini, cuaca dipakai sebagai konteks CARS dan
+                                                    strict weather filter saat terdeteksi hujan.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -702,6 +720,12 @@
                                             <span class="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
                                                 Source: {{ data_get($result, 'weather_source') ?? '-' }}
                                             </span>
+
+                                            @if (str_contains(strtolower((string) data_get($result, 'weather_source', '')), 'bmkg'))
+                                                <span class="rounded-full bg-cyan-100 px-3 py-1 text-cyan-700">
+                                                    {{ $bmkgForecastPeriodText }} · {{ $bmkgForecastIntervalText }}
+                                                </span>
+                                            @endif
 
                                             <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
                                                 Candidates: {{ data_get($result, 'total_candidates') ?? '-' }}
