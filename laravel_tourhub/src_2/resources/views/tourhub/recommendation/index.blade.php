@@ -109,10 +109,32 @@
                     data_get($payload ?? [], 'kategori_preferensi', ['Alam']),
                 );
 
-                $selectedKabupaten = old(
-                    'kabupaten_kota',
-                    data_get($payload ?? [], 'kabupaten_kota', 'Kabupaten Gianyar'),
-                );
+                $locationOptions = [
+                    'Kabupaten Gianyar' => ['Ubud', 'Gianyar', 'Tegallalang', 'Blahbatuh', 'Tampaksiring', 'Sukawati', 'Payangan'],
+                    'Kabupaten Badung' => ['Kuta', 'Kuta Selatan', 'Kuta Utara', 'Mengwi', 'Abiansemal', 'Petang'],
+                    'Kabupaten Tabanan' => ['Tabanan', 'Kediri', 'Penebel', 'Baturiti', 'Pupuan', 'Selemadeg Timur', 'Selemadeg Barat', 'Kerambitan', 'Marga'],
+                    'Kabupaten Buleleng' => ['Buleleng', 'Gerokgak', 'Seririt', 'Busungbiu', 'Banjar', 'Sukasada', 'Sawan', 'Kubutambahan', 'Tejakula'],
+                    'Kabupaten Karangasem' => ['Karangasem', 'Rendang', 'Sidemen', 'Manggis', 'Abang', 'Bebandem', 'Selat', 'Kubu'],
+                    'Kabupaten Bangli' => ['Kintamani', 'Bangli', 'Susut', 'Tembuku'],
+                    'Kabupaten Klungkung' => ['Nusa Penida', 'Klungkung', 'Banjarangkan', 'Dawan'],
+                    'Kabupaten Jembrana' => ['Negara', 'Jembrana', 'Mendoyo', 'Melaya', 'Pekutatan'],
+                    'Kota Denpasar' => ['Denpasar Selatan', 'Denpasar Barat', 'Denpasar Timur', 'Denpasar Utara'],
+                ];
+
+                $selectedLokasi = old('lokasi_wisata');
+
+                if ($selectedLokasi === null) {
+                    $payloadKabupaten = data_get($payload ?? [], 'kabupaten_kota');
+                    $payloadKecamatan = data_get($payload ?? [], 'kecamatan');
+
+                    if (isset($payload) && $payloadKabupaten) {
+                        $selectedLokasi = $payloadKabupaten . '|' . ($payloadKecamatan ?: '');
+                    } elseif (isset($payload)) {
+                        $selectedLokasi = '';
+                    } else {
+                        $selectedLokasi = 'Kabupaten Gianyar|Ubud';
+                    }
+                }
 
                 $selectedWeather = old('weather', data_get($payload ?? [], 'weather', 'cerah'));
 
@@ -384,58 +406,53 @@
                                     </div>
 
                                     <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-                                        <div class="lg:col-span-4">
+                                        <div class="lg:col-span-8">
                                             <label
-                                                for="kabupaten_kota"
+                                                for="lokasi_wisata"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
                                             >
-                                                Kabupaten/Kota
+                                                Lokasi Wisata
                                             </label>
 
                                             <select
-                                                id="kabupaten_kota"
-                                                name="kabupaten_kota"
+                                                id="lokasi_wisata"
+                                                name="lokasi_wisata"
                                                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-900"
                                             >
-                                                @foreach ([
-                                                        '',
-                                                        'Kabupaten Gianyar',
-                                                        'Kabupaten Badung',
-                                                        'Kabupaten Tabanan',
-                                                        'Kabupaten Buleleng',
-                                                        'Kabupaten Karangasem',
-                                                        'Kabupaten Bangli',
-                                                        'Kabupaten Klungkung',
-                                                        'Kabupaten Jembrana',
-                                                        'Kota Denpasar'
-                                                    ]
-                                                    as $kabupaten)
-                                                    <option
-                                                        value="{{ $kabupaten }}"
-                                                        @selected($selectedKabupaten === $kabupaten)
-                                                    >
-                                                        {{ $kabupaten ?: 'Semua Kabupaten/Kota' }}
-                                                    </option>
+                                                <option value="" @selected($selectedLokasi === '')>Semua Bali / semua kabupaten</option>
+
+                                                @foreach ($locationOptions as $kabupaten => $kecamatans)
+                                                    @php
+                                                        $kabupatenOnlyValue = $kabupaten . '|';
+                                                    @endphp
+
+                                                    <optgroup label="{{ $kabupaten }}">
+                                                        <option
+                                                            value="{{ $kabupatenOnlyValue }}"
+                                                            @selected($selectedLokasi === $kabupatenOnlyValue)
+                                                        >
+                                                            Semua kecamatan di {{ $kabupaten }}
+                                                        </option>
+
+                                                        @foreach ($kecamatans as $kecamatanOption)
+                                                            @php
+                                                                $lokasiValue = $kabupaten . '|' . $kecamatanOption;
+                                                            @endphp
+
+                                                            <option
+                                                                value="{{ $lokasiValue }}"
+                                                                @selected($selectedLokasi === $lokasiValue)
+                                                            >
+                                                                {{ $kabupaten }} — {{ $kecamatanOption }}
+                                                            </option>
+                                                        @endforeach
+                                                    </optgroup>
                                                 @endforeach
                                             </select>
-                                        </div>
 
-                                        <div class="lg:col-span-4">
-                                            <label
-                                                for="kecamatan"
-                                                class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
-                                            >
-                                                Kecamatan
-                                            </label>
-
-                                            <input
-                                                id="kecamatan"
-                                                type="text"
-                                                name="kecamatan"
-                                                value="{{ old('kecamatan', data_get($payload ?? [], 'kecamatan')) }}"
-                                                placeholder="Contoh: Ubud, Kuta, Kintamani"
-                                                class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400"
-                                            />
+                                            <p class="mt-2 text-xs font-semibold text-slate-500">
+                                                Lokasi sudah dipasangkan manual, jadi user tidak bisa memilih kecamatan yang tidak sesuai kabupaten.
+                                            </p>
                                         </div>
 
                                         <div class="lg:col-span-4">

@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
-use App\Http\Controllers\Controller;
+use Throwable;
+use RuntimeException;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Models\RecommendationLog;
+use Illuminate\Http\JsonResponse;
 use App\Services\TourHubMlService;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\View as ViewFacade;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use RuntimeException;
-use Throwable;
 
 final class RecommendationController extends Controller
 {
@@ -62,6 +62,8 @@ final class RecommendationController extends Controller
     {
         $this->ensureViewExists();
 
+        $locationPairValues = $this->locationPairValues();
+
         $validated = $request->validate([
             'kategori_preferensi' => ['required', 'array', 'min:1'],
             'kategori_preferensi.*' => [
@@ -69,6 +71,15 @@ final class RecommendationController extends Controller
                 Rule::in(['Alam', 'Budaya', 'Rekreasi', 'Umum']),
             ],
 
+            'lokasi_wisata' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::in($locationPairValues),
+            ],
+
+            // Tetap disediakan untuk backward compatibility jika ada request lama/API internal
+            // yang masih mengirim kabupaten_kota dan kecamatan secara terpisah.
             'kabupaten_kota' => ['nullable', 'string', 'max:150'],
             'kecamatan' => ['nullable', 'string', 'max:150'],
             'keywords' => ['nullable', 'string', 'max:255'],
@@ -163,6 +174,11 @@ final class RecommendationController extends Controller
      */
     private function buildPayload(array $validated): array
     {
+        [$kabupatenKota, $kecamatan] = $this->resolvePostedLocation($validated);
+
+        $validated['kabupaten_kota'] = $kabupatenKota;
+        $validated['kecamatan'] = $kecamatan;
+
         $useBmkg = $this->toBoolean($validated['use_bmkg'] ?? false);
 
         $bmkgAdm4 = $this->nullableString($validated['bmkg_adm4'] ?? null);
@@ -180,8 +196,8 @@ final class RecommendationController extends Controller
         return [
             'kategori_preferensi' => $validated['kategori_preferensi'],
 
-            'kabupaten_kota' => $this->nullableString($validated['kabupaten_kota'] ?? null),
-            'kecamatan' => $this->nullableString($validated['kecamatan'] ?? null),
+            'kabupaten_kota' => $kabupatenKota,
+            'kecamatan' => $kecamatan,
 
             'keywords' => $this->parseKeywords($validated['keywords'] ?? null),
 
@@ -728,6 +744,104 @@ final class RecommendationController extends Controller
     private function calculateResponseTime(float $startedAt): int
     {
         return (int) round((microtime(true) - $startedAt) * 1000);
+    }
+
+    /**
+     * Daftar lokasi valid yang dipakai form.
+     *
+     * Format value form dibuat menjadi:
+     * kabupaten_kota|kecamatan
+     *
+     * Dengan cara ini user tidak bisa memilih kombinasi salah seperti:
+     * Kabupaten Buleleng + Tegallalang.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function locationOptions(): array
+    {
+        return [
+            'Kabupaten Gianyar' => ['Ubud', 'Gianyar', 'Tegallalang', 'Blahbatuh', 'Tampaksiring', 'Sukawati', 'Payangan'],
+            'Kabupaten Badung' => ['Kuta', 'Kuta Selatan', 'Kuta Utara', 'Mengwi', 'Abiansemal', 'Petang'],
+            'Kabupaten Tabanan' => ['Tabanan', 'Kediri', 'Penebel', 'Baturiti', 'Pupuan', 'Selemadeg Timur', 'Selemadeg Barat', 'Kerambitan', 'Marga'],
+            'Kabupaten Buleleng' => ['Buleleng', 'Gerokgak', 'Seririt', 'Busungbiu', 'Banjar', 'Sukasada', 'Sawan', 'Kubutambahan', 'Tejakula'],
+            'Kabupaten Karangasem' => ['Karangasem', 'Rendang', 'Sidemen', 'Manggis', 'Abang', 'Bebandem', 'Selat', 'Kubu'],
+            'Kabupaten Bangli' => ['Kintamani', 'Bangli', 'Susut', 'Tembuku'],
+            'Kabupaten Klungkung' => ['Nusa Penida', 'Klungkung', 'Banjarangkan', 'Dawan'],
+            'Kabupaten Jembrana' => ['Negara', 'Jembrana', 'Mendoyo', 'Melaya', 'Pekutatan'],
+            'Kota Denpasar' => ['Denpasar Selatan', 'Denpasar Barat', 'Denpasar Timur', 'Denpasar Utara'],
+        ];
+    }
+
+    /**
+     * Value lokasi yang valid untuk Rule::in().
+     *
+     * @return array<int, string>
+     */
+    private function locationPairValues(): array
+    {
+        $values = [''];
+
+        foreach ($this->locationOptions() as $kabupatenKota => $kecamatans) {
+            $values[] = $kabupatenKota.'|';
+
+            foreach ($kecamatans as $kecamatan) {
+                $values[] = $kabupatenKota.'|'.$kecamatan;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * Mengambil kabupaten/kota dan kecamatan dari input lokasi_wisata.
+     *
+     * Jika lokasi_wisata kosong, sistem tetap menerima field lama
+     * kabupaten_kota dan kecamatan sebagai fallback.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function resolvePostedLocation(array $validated): array
+    {
+        $locationPair = $this->nullableString($validated['lokasi_wisata'] ?? null);
+
+        if ($locationPair) {
+            return $this->parseLocationPair($locationPair);
+        }
+
+        return [
+            $this->nullableString($validated['kabupaten_kota'] ?? null),
+            $this->nullableString($validated['kecamatan'] ?? null),
+        ];
+    }
+
+    /**
+     * Parse value "Kabupaten Gianyar|Ubud" menjadi payload ML.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function parseLocationPair(string $locationPair): array
+    {
+        [$kabupatenKota, $kecamatan] = array_pad(explode('|', $locationPair, 2), 2, null);
+
+        $kabupatenKota = $this->nullableString($kabupatenKota);
+        $kecamatan = $this->nullableString($kecamatan);
+
+        if (! $kabupatenKota) {
+            return [null, null];
+        }
+
+        $options = $this->locationOptions();
+
+        if (! array_key_exists($kabupatenKota, $options)) {
+            return [null, null];
+        }
+
+        if ($kecamatan && ! in_array($kecamatan, $options[$kabupatenKota], true)) {
+            $kecamatan = null;
+        }
+
+        return [$kabupatenKota, $kecamatan];
     }
 
     /**
