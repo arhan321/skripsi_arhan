@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\RegisteredUserController;
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\User\UserDashboardController;
 use App\Http\Controllers\Web\RecommendationController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
 Route::get('/', function () {
     return view('auth.login');
@@ -84,3 +84,4 @@ Route::middleware('auth')->group(function (): void {
                 ->name('ml.health');
         });
 });
+

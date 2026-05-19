@@ -284,9 +284,10 @@
                                 <a
                                     href="{{ data_get($bestRecommendation, 'link_google_maps') }}"
                                     target="_blank"
+                                    rel="noopener noreferrer"
                                     class="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700"
                                 >
-                                    Buka Maps
+                                    📍 Buka Maps
                                 </a>
                             @endif
                         </div>
@@ -424,11 +425,30 @@
                                             </p>
                                         </div>
 
-                                        <div class="rounded-2xl bg-slate-950 px-4 py-3 text-white">
-                                            <p class="text-xs font-bold text-slate-300">Final Score</p>
-                                            <p class="text-2xl font-black">
-                                                {{ data_get($item, 'final_score') }}
-                                            </p>
+                                        <div class="flex shrink-0 flex-col gap-2 md:min-w-[150px]">
+                                            <div class="rounded-2xl bg-slate-950 px-4 py-3 text-white">
+                                                <p class="text-xs font-bold text-slate-300">Final Score</p>
+                                                <p class="text-2xl font-black">
+                                                    {{ data_get($item, 'final_score') }}
+                                                </p>
+                                            </div>
+
+                                            @if (data_get($item, 'link_google_maps'))
+                                                <a
+                                                    href="{{ data_get($item, 'link_google_maps') }}"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700"
+                                                >
+                                                    📍 Buka Maps
+                                                </a>
+                                            @else
+                                                <span
+                                                    class="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-500"
+                                                >
+                                                    Maps tidak tersedia
+                                                </span>
+                                            @endif
                                         </div>
                                     </div>
 
@@ -486,7 +506,7 @@
                 <pre
                     class="mt-4 max-h-[520px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100"
                 >
-{{ json_encode($log->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
+                {{ json_encode($log->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
                 >
             </div>
 
@@ -497,7 +517,7 @@
                 <pre
                     class="mt-4 max-h-[520px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100"
                 >
-{{ json_encode($log->response_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
+                {{ json_encode($log->response_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
                 >
             </div>
         </section>

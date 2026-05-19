@@ -105,6 +105,24 @@ def weather_group(weather: Optional[str]) -> str:
     return "tidak_diketahui"
 
 
+def is_rainy_weather(weather: Optional[str]) -> bool:
+    """Return True jika cuaca masuk kelompok hujan.
+
+    Fungsi ini dipakai untuk strict weather filtering.
+    Contoh input yang dianggap hujan:
+    - hujan
+    - hujan ringan
+    - hujan sedang
+    - hujan lebat
+    - gerimis
+    - rain / shower / storm
+
+    Dengan rule ini, saat cuaca hujan, destinasi bertipe outdoor
+    bisa dikeluarkan dari kandidat rekomendasi.
+    """
+    return weather_group(weather) == "hujan"
+
+
 def compute_context_multiplier(
     tipe_wisata: str,
     popularity_score: float,
@@ -303,6 +321,7 @@ class TourHubRecommender:
         weather: Optional[str] = None,
         visit_day: Optional[str] = None,
         is_high_season: bool = False,
+        strict_weather_filter: bool = True,
     ) -> Tuple[pd.DataFrame, Dict[str, object]]:
         kategori_preferensi = kategori_preferensi or []
         keywords = keywords or []
@@ -314,7 +333,11 @@ class TourHubRecommender:
         result = self.df.copy()
         result["cbf_score"] = cbf_scores
 
-        # Filter lembut untuk lokasi/rating. Kategori tidak difilter keras agar sistem tetap bisa eksploratif.
+        # Filter lembut untuk lokasi/rating.
+        # Catatan:
+        # - Kategori sengaja tidak difilter keras agar sistem tetap eksploratif.
+        # - Cuaca hujan memakai strict weather filter: destinasi outdoor dikeluarkan
+        #   dari kandidat agar hasil lebih sesuai dengan kondisi kunjungan.
         if kabupaten_kota:
             result = result[result["kabupaten_kota"].str.lower() == kabupaten_kota.lower()]
         if kecamatan:
@@ -322,8 +345,52 @@ class TourHubRecommender:
         if min_rating is not None:
             result = result[result["rating"] >= float(min_rating)]
 
+        total_after_basic_filter = int(len(result))
+
+        strict_weather_filter_applied = False
+        strict_weather_filter_removed_outdoor = 0
+        strict_weather_filter_reason: Optional[str] = None
+
+        if strict_weather_filter and is_rainy_weather(weather):
+            before_weather_filter = int(len(result))
+
+            result = result[
+                result["tipe_wisata"]
+                .fillna("")
+                .astype(str)
+                .str.lower()
+                .ne("outdoor")
+            ].copy()
+
+            after_weather_filter = int(len(result))
+            strict_weather_filter_applied = True
+            strict_weather_filter_removed_outdoor = before_weather_filter - after_weather_filter
+            strict_weather_filter_reason = (
+                "Cuaca terdeteksi hujan, sehingga destinasi outdoor tidak ditampilkan "
+                "demi kenyamanan dan keamanan wisatawan."
+            )
+
         if result.empty:
-            return result, {"user_query": user_query, "message": "Tidak ada kandidat setelah filter."}
+            message = "Tidak ada kandidat setelah filter."
+
+            if strict_weather_filter_applied:
+                message = (
+                    "Tidak ada kandidat non-outdoor setelah strict weather filter. "
+                    "Coba pilih lokasi/kategori lain, turunkan min_rating, atau matikan strict_weather_filter."
+                )
+
+            return result, {
+                "user_query": user_query,
+                "weather_group": weather_group(weather),
+                "total_after_basic_filter": total_after_basic_filter,
+                "total_after_filter": 0,
+                "total_returned": 0,
+                "strict_weather_filter": bool(strict_weather_filter),
+                "strict_weather_filter_applied": strict_weather_filter_applied,
+                "strict_weather_filter_removed_outdoor": strict_weather_filter_removed_outdoor,
+                "strict_weather_filter_reason": strict_weather_filter_reason,
+                "message": message,
+            }
 
         context_values = result.apply(
             lambda row: compute_context_multiplier(
@@ -344,7 +411,9 @@ class TourHubRecommender:
         )
         result["final_score"] = result["base_score"] * result["context_multiplier"]
 
-        result = result.sort_values("final_score", ascending=False).head(top_n)
+        total_after_filter = int(len(result))
+
+        result = result.sort_values("final_score", ascending=False).head(top_n).copy()
         result["alasan"] = result.apply(self._build_reason, axis=1)
 
         output_columns = [
@@ -370,7 +439,13 @@ class TourHubRecommender:
         meta = {
             "user_query": user_query,
             "weather_group": weather_group(weather),
-            "total_after_filter": int(len(result)),
+            "total_after_basic_filter": total_after_basic_filter,
+            "total_after_filter": total_after_filter,
+            "total_returned": int(len(result)),
+            "strict_weather_filter": bool(strict_weather_filter),
+            "strict_weather_filter_applied": strict_weather_filter_applied,
+            "strict_weather_filter_removed_outdoor": strict_weather_filter_removed_outdoor,
+            "strict_weather_filter_reason": strict_weather_filter_reason,
         }
         return result[output_columns], meta
 
