@@ -164,19 +164,13 @@ final class RecommendationController extends Controller
     /**
      * Membentuk payload yang akan dikirim ke FastAPI ML.
      *
-     * PERBAIKAN BMKG OTOMATIS:
-     * - Cuaca manual tidak lagi dijadikan input utama.
-     * - Weather selalu dikirim sebagai fallback default: "cerah".
-     * - Controller otomatis mencari kode ADM4 dari lokasi yang dipilih.
-     * - Jika ADM4 ditemukan, FastAPI akan memakai BMKG sebagai konteks cuaca.
-     * - Jika suatu saat ADM4 gagal ditemukan, sistem tetap aman dengan fallback cerah.
-     *
-     * Catatan:
-     * Logic lama TIDAK DIHAPUS. Logic lama disimpan sebagai CODE MATI
-     * tepat di bawah method ini agar bisa dibandingkan atau rollback.
+     * Jika use_bmkg = true dan bmkg_adm4 kosong,
+     * sistem otomatis mencari ADM4 berdasarkan kabupaten/kota + kecamatan.
      *
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
+     *
+     * @throws ValidationException
      */
     private function buildPayload(array $validated): array
     {
@@ -185,25 +179,19 @@ final class RecommendationController extends Controller
         $validated['kabupaten_kota'] = $kabupatenKota;
         $validated['kecamatan'] = $kecamatan;
 
-        /*
-         * BMKG OTOMATIS UNTUK WEB
-         *
-         * Alur:
-         * 1. Jika request membawa bmkg_adm4, pakai nilai tersebut.
-         * 2. Jika kosong, cari otomatis dari kabupaten/kota + kecamatan.
-         * 3. Jika masih kosong, sistem tetap jalan dengan use_bmkg=false
-         *    dan weather fallback "cerah".
-         *
-         * Pada controller ini resolveBmkgAdm4() sudah memiliki fallback
-         * terakhir DEFAULT_BALI_ADM4, sehingga normalnya bmkg_adm4 tetap terisi.
-         */
+        $useBmkg = $this->toBoolean($validated['use_bmkg'] ?? false);
+
         $bmkgAdm4 = $this->nullableString($validated['bmkg_adm4'] ?? null);
 
-        if (! $bmkgAdm4) {
+        if ($useBmkg && ! $bmkgAdm4) {
             $bmkgAdm4 = $this->resolveBmkgAdm4($validated);
         }
 
-        $useBmkg = $bmkgAdm4 !== null && $bmkgAdm4 !== '';
+        if ($useBmkg && ! $bmkgAdm4) {
+            throw ValidationException::withMessages([
+                'bmkg_adm4' => 'Kode ADM4 BMKG belum tersedia untuk wilayah ini. Coba isi kecamatan yang valid atau matikan opsi Gunakan BMKG.',
+            ]);
+        }
 
         return [
             'kategori_preferensi' => $validated['kategori_preferensi'],
@@ -219,97 +207,14 @@ final class RecommendationController extends Controller
 
             'top_n' => (int) $validated['top_n'],
 
-            /*
-             * Weather hanya fallback.
-             * Jika use_bmkg=true dan bmkg_adm4 terisi, FastAPI akan mengambil
-             * prakiraan cuaca BMKG otomatis. Jika BMKG gagal, FastAPI tetap
-             * memakai fallback "cerah".
-             */
-            'weather' => 'cerah',
-
+            'weather' => $this->nullableString($validated['weather'] ?? null),
             'visit_day' => $this->nullableString($validated['visit_day'] ?? null),
 
             'is_high_season' => $this->toBoolean($validated['is_high_season'] ?? false),
-
-            /*
-             * BMKG otomatis aktif selama ADM4 berhasil tersedia.
-             */
             'use_bmkg' => $useBmkg,
             'bmkg_adm4' => $useBmkg ? $bmkgAdm4 : null,
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CODE MATI - buildPayload lama sebelum BMKG otomatis
-    |--------------------------------------------------------------------------
-    |
-    | Logic lama sengaja DIKOMENTARKAN, bukan dihapus.
-    | Perbedaan utama:
-    | - Dulu use_bmkg mengikuti input checkbox/form.
-    | - Dulu weather mengikuti input manual dari user.
-    | - Dulu jika use_bmkg=true tetapi ADM4 kosong, controller melempar validasi error.
-    |
-    | Sekarang:
-    | - BMKG dicari otomatis dari lokasi.
-    | - weather default/fallback selalu "cerah".
-    | - User tidak perlu memilih cuaca manual.
-    |
-    */
-    //     /**
-    //      * Membentuk payload yang akan dikirim ke FastAPI ML.
-    //      *
-    //      * Jika use_bmkg = true dan bmkg_adm4 kosong,
-    //      * sistem otomatis mencari ADM4 berdasarkan kabupaten/kota + kecamatan.
-    //      *
-    //      * @param  array<string, mixed>  $validated
-    //      * @return array<string, mixed>
-    //      *
-    //      * @throws ValidationException
-    //      */
-    //     private function buildPayload(array $validated): array
-    //     {
-    //         [$kabupatenKota, $kecamatan] = $this->resolvePostedLocation($validated);
-    //
-    //         $validated['kabupaten_kota'] = $kabupatenKota;
-    //         $validated['kecamatan'] = $kecamatan;
-    //
-    //         $useBmkg = $this->toBoolean($validated['use_bmkg'] ?? false);
-    //
-    //         $bmkgAdm4 = $this->nullableString($validated['bmkg_adm4'] ?? null);
-    //
-    //         if ($useBmkg && ! $bmkgAdm4) {
-    //             $bmkgAdm4 = $this->resolveBmkgAdm4($validated);
-    //         }
-    //
-    //         if ($useBmkg && ! $bmkgAdm4) {
-    //             throw ValidationException::withMessages([
-    //                 'bmkg_adm4' => 'Kode ADM4 BMKG belum tersedia untuk wilayah ini. Coba isi kecamatan yang valid atau matikan opsi Gunakan BMKG.',
-    //             ]);
-    //         }
-    //
-    //         return [
-    //             'kategori_preferensi' => $validated['kategori_preferensi'],
-    //
-    //             'kabupaten_kota' => $kabupatenKota,
-    //             'kecamatan' => $kecamatan,
-    //
-    //             'keywords' => $this->parseKeywords($validated['keywords'] ?? null),
-    //
-    //             'min_rating' => isset($validated['min_rating'])
-    //                 ? (float) $validated['min_rating']
-    //                 : null,
-    //
-    //             'top_n' => (int) $validated['top_n'],
-    //
-    //             'weather' => $this->nullableString($validated['weather'] ?? null),
-    //             'visit_day' => $this->nullableString($validated['visit_day'] ?? null),
-    //
-    //             'is_high_season' => $this->toBoolean($validated['is_high_season'] ?? false),
-    //             'use_bmkg' => $useBmkg,
-    //             'bmkg_adm4' => $useBmkg ? $bmkgAdm4 : null,
-    //         ];
-    //     }
 
     /**
      * Resolve ADM4 BMKG berdasarkan kabupaten/kota dan kecamatan.

@@ -136,13 +136,16 @@
                     }
                 }
 
-                $selectedWeather = old('weather', data_get($payload ?? [], 'weather', 'cerah'));
+                // Cuaca tidak lagi dipilih manual oleh user.
+                // Nilai ini hanya sebagai fallback jika BMKG gagal/tidak tersedia.
+                $selectedWeather = 'cerah';
 
                 $selectedVisitDay = old('visit_day', data_get($payload ?? [], 'visit_day', 'weekday'));
 
                 $isHighSeason = old('is_high_season', data_get($payload ?? [], 'is_high_season', false));
 
-                $useBmkg = old('use_bmkg', data_get($payload ?? [], 'use_bmkg', false));
+                // BMKG dibuat aktif otomatis agar user tidak perlu memilih cuaca manual.
+                $useBmkg = true;
 
                 $selectedKategoriArray = (array) $selectedKategori;
 
@@ -326,7 +329,7 @@
                                     <div class="grid grid-cols-2 gap-2 text-xs font-black md:flex">
                                         <span class="rounded-2xl bg-slate-950 px-3 py-2 text-white">CBF + CARS</span>
                                         <span class="rounded-2xl bg-blue-100 px-3 py-2 text-blue-700">
-                                            BMKG / Manual
+                                            BMKG Otomatis
                                         </span>
                                     </div>
                                 </div>
@@ -524,26 +527,27 @@
 
                                         <div>
                                             <label
-                                                for="weather"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
                                             >
-                                                Cuaca Manual
+                                                Cuaca Otomatis
                                             </label>
 
-                                            <select
-                                                id="weather"
-                                                name="weather"
-                                                class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-900"
+                                            <div
+                                                class="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm font-semibold text-slate-900"
                                             >
-                                                @foreach (['cerah', 'hujan', 'mendung', 'berawan', 'unknown'] as $weather)
-                                                    <option
-                                                        value="{{ $weather }}"
-                                                        @selected($selectedWeather === $weather)
-                                                    >
-                                                        {{ ucfirst($weather) }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                                <div class="flex items-start gap-3">
+                                                    <span class="text-xl">🌤️</span>
+                                                    <div>
+                                                        <p class="font-black text-slate-950">Otomatis dari BMKG</p>
+                                                        <p class="mt-1 text-xs font-medium leading-5 text-slate-500">
+                                                            Default sistem adalah cerah. Jika BMKG mendeteksi hujan,
+                                                            CARS otomatis memprioritaskan destinasi indoor atau mixed.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <input type="hidden" name="weather" value="cerah" />
                                         </div>
 
                                         <div>
@@ -580,24 +584,20 @@
                                                 </span>
                                                 <span>
                                                     <span class="block text-sm font-black text-slate-900">
-                                                        Gunakan BMKG
+                                                        BMKG Otomatis
                                                     </span>
                                                     <span class="text-xs leading-5 text-slate-500">
-                                                        Ambil prakiraan cuaca otomatis berdasarkan wilayah
+                                                        Sistem mengambil prakiraan cuaca otomatis berdasarkan wilayah
                                                         untuk periode ±3 hari ke depan.
                                                     </span>
                                                 </span>
                                             </span>
 
                                             <span class="flex items-center gap-2">
-                                                <input type="hidden" name="use_bmkg" value="0" />
-                                                <input
-                                                    type="checkbox"
-                                                    name="use_bmkg"
-                                                    value="1"
-                                                    @checked((bool) $useBmkg)
-                                                    class="h-5 w-5 rounded border-slate-300"
-                                                />
+                                                <input type="hidden" name="use_bmkg" value="1" />
+                                                <span class="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
+                                                    Aktif Otomatis
+                                                </span>
                                             </span>
                                         </label>
 
@@ -645,8 +645,8 @@
                                                 <p class="font-black text-blue-900">{{ $bmkgForecastPeriodText }}</p>
                                                 <p class="mt-1 text-[11px] leading-5 text-blue-700">
                                                     Data prakiraan cuaca BMKG bersifat 3 harian dengan interval sekitar
-                                                    3 jam. Di sistem ini, cuaca dipakai sebagai konteks CARS dan
-                                                    strict weather filter saat terdeteksi hujan.
+                                                    3 jam. Di sistem ini, cuaca dipakai sebagai konteks CARS. Jika
+                                                    hujan terdeteksi, sistem memprioritaskan destinasi indoor atau mixed.
                                                 </p>
                                             </div>
                                         </div>
@@ -718,7 +718,7 @@
                                             </span>
 
                                             <span class="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
-                                                Source: {{ data_get($result, 'weather_source') ?? '-' }}
+                                                Sumber Cuaca: {{ data_get($result, 'weather_source') ?? '-' }}
                                             </span>
 
                                             @if (str_contains(strtolower((string) data_get($result, 'weather_source', '')), 'bmkg'))
@@ -735,6 +735,13 @@
                                                 Response: {{ $responseTimeMs ?? '-' }} ms
                                             </span>
                                         </div>
+
+                                        @if (strtolower((string) data_get($result, 'weather_used')) === 'hujan')
+                                            <div class="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+                                                🌧️ BMKG mendeteksi potensi hujan pada wilayah ini. Sistem otomatis
+                                                memprioritaskan destinasi indoor atau mixed agar perjalanan lebih nyaman.
+                                            </div>
+                                        @endif
                                     </div>
 
                                     <div class="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-slate-200">

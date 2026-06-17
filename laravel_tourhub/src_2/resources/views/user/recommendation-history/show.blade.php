@@ -498,7 +498,7 @@
         @endif
 
         {{-- JSON Payload --}}
-        <section class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {{-- <section class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 class="text-lg font-black text-slate-950">Request Payload</h2>
                 <p class="mt-1 text-sm text-slate-500">Parameter yang dikirim Laravel ke FastAPI.</p>
@@ -520,6 +520,6 @@
                 {{ json_encode($log->response_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
                 >
             </div>
-        </section>
+        </section> --}}
     </div>
 </x-layouts.tourhub-auth>
