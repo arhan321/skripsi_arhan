@@ -332,25 +332,41 @@ final class RecommendationController extends Controller
 
         $kecamatan = $this->normalizeLocation($validated['kecamatan'] ?? null);
 
+        /*
+         * PERBAIKAN VALIDASI ADM4 BMKG
+         *
+         * Sebelumnya mapping manual langsung dikembalikan begitu ditemukan.
+         * Akibatnya, jika ada satu kode ADM4 manual yang sudah tidak valid
+         * atau tidak dikenali API BMKG, FastAPI akan fallback dengan error 404.
+         *
+         * Sekarang setiap kandidat ADM4 dicek dulu ke API publik BMKG melalui
+         * isValidBmkgAdm4(). Jika kandidat tidak valid, sistem lanjut ke
+         * fallback berikutnya sampai mendapatkan ADM4 yang benar-benar valid.
+         */
+
         $manualAdm4 = $this->resolveManualBmkgAdm4(
             kabupatenKota: $kabupatenKota,
             kecamatan: $kecamatan,
         );
 
-        if ($manualAdm4) {
-            return $manualAdm4;
+        $validManualAdm4 = $this->resolveValidatedAdm4Candidate($manualAdm4);
+
+        if ($validManualAdm4) {
+            return $validManualAdm4;
         }
 
         $adm4ByKecamatanOnly = $this->resolveBmkgAdm4ByKecamatanOnly($kecamatan);
+        $validAdm4ByKecamatanOnly = $this->resolveValidatedAdm4Candidate($adm4ByKecamatanOnly);
 
-        if ($adm4ByKecamatanOnly) {
-            return $adm4ByKecamatanOnly;
+        if ($validAdm4ByKecamatanOnly) {
+            return $validAdm4ByKecamatanOnly;
         }
 
         $adm4ByKabupaten = $this->resolveFallbackBmkgAdm4ByKabupaten($kabupatenKota);
+        $validAdm4ByKabupaten = $this->resolveValidatedAdm4Candidate($adm4ByKabupaten);
 
-        if ($adm4ByKabupaten) {
-            return $adm4ByKabupaten;
+        if ($validAdm4ByKabupaten) {
+            return $validAdm4ByKabupaten;
         }
 
         $adm3 = $this->resolveBmkgAdm3(
@@ -360,19 +376,110 @@ final class RecommendationController extends Controller
 
         if ($adm3) {
             $adm4FromBmkgPage = $this->resolveFirstAdm4FromBmkgAdm3($adm3);
+            $validAdm4FromBmkgPage = $this->resolveValidatedAdm4Candidate($adm4FromBmkgPage);
 
-            if ($adm4FromBmkgPage) {
-                return $adm4FromBmkgPage;
+            if ($validAdm4FromBmkgPage) {
+                return $validAdm4FromBmkgPage;
             }
 
+            /*
+             * resolveAdm4ByCandidateScan() sudah melakukan validasi satu per satu.
+             * Namun tetap dilewatkan ke resolveValidatedAdm4Candidate() sebagai
+             * lapisan pengaman terakhir.
+             */
             $adm4FromCandidateScan = $this->resolveAdm4ByCandidateScan($adm3);
+            $validAdm4FromCandidateScan = $this->resolveValidatedAdm4Candidate($adm4FromCandidateScan);
 
-            if ($adm4FromCandidateScan) {
-                return $adm4FromCandidateScan;
+            if ($validAdm4FromCandidateScan) {
+                return $validAdm4FromCandidateScan;
             }
         }
 
-        return self::DEFAULT_BALI_ADM4;
+        /*
+         * Fallback terakhir hanya dipakai jika kode default Bali valid.
+         * Jika suatu saat API BMKG berubah dan default juga tidak valid,
+         * return null agar buildPayload() otomatis menonaktifkan BMKG dan
+         * FastAPI memakai fallback cuaca cerah tanpa memunculkan error.
+         */
+        return $this->resolveValidatedAdm4Candidate(self::DEFAULT_BALI_ADM4);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CODE MATI - resolveBmkgAdm4 lama sebelum validasi ADM4
+    |--------------------------------------------------------------------------
+    |
+    | Logic lama sengaja DIKOMENTARKAN, bukan dihapus.
+    | Perbedaan utama:
+    | - Dulu setiap ADM4 dari mapping manual langsung di-return tanpa dicek ke API BMKG.
+    | - Jika mapping manual ternyata tidak valid/404, FastAPI akan fallback dan menampilkan
+    |   source default_cerah_bmkg_error.
+    |
+    | Sekarang:
+    | - Setiap kandidat ADM4 dicek dulu menggunakan resolveValidatedAdm4Candidate().
+    | - Jika kandidat tidak valid, sistem lanjut ke fallback berikutnya.
+    | - Jika semua kandidat gagal, BMKG dimatikan otomatis dan cuaca fallback tetap cerah.
+    |
+    | Potongan logic lama yang dimatikan:
+    |
+    | $manualAdm4 = $this->resolveManualBmkgAdm4(
+    |     kabupatenKota: $kabupatenKota,
+    |     kecamatan: $kecamatan,
+    | );
+    |
+    | if ($manualAdm4) {
+    |     return $manualAdm4;
+    | }
+    |
+    | $adm4ByKecamatanOnly = $this->resolveBmkgAdm4ByKecamatanOnly($kecamatan);
+    |
+    | if ($adm4ByKecamatanOnly) {
+    |     return $adm4ByKecamatanOnly;
+    | }
+    |
+    | $adm4ByKabupaten = $this->resolveFallbackBmkgAdm4ByKabupaten($kabupatenKota);
+    |
+    | if ($adm4ByKabupaten) {
+    |     return $adm4ByKabupaten;
+    | }
+    |
+    | if ($adm3) {
+    |     $adm4FromBmkgPage = $this->resolveFirstAdm4FromBmkgAdm3($adm3);
+    |
+    |     if ($adm4FromBmkgPage) {
+    |         return $adm4FromBmkgPage;
+    |     }
+    |
+    |     $adm4FromCandidateScan = $this->resolveAdm4ByCandidateScan($adm3);
+    |
+    |     if ($adm4FromCandidateScan) {
+    |         return $adm4FromCandidateScan;
+    |     }
+    | }
+    |
+    | return self::DEFAULT_BALI_ADM4;
+    |
+    */
+
+    /**
+     * Validasi satu kandidat ADM4 sebelum dipakai sebagai payload BMKG.
+     *
+     * Method ini sengaja dibuat terpisah agar mapping manual lama tetap ada,
+     * tetapi kode yang tidak valid tidak lagi langsung dikirim ke FastAPI.
+     */
+    private function resolveValidatedAdm4Candidate(?string $adm4): ?string
+    {
+        $adm4 = $this->nullableString($adm4);
+
+        if (! $adm4) {
+            return null;
+        }
+
+        if ($this->isValidBmkgAdm4($adm4)) {
+            return $adm4;
+        }
+
+        return null;
     }
 
     /**
@@ -397,7 +504,7 @@ final class RecommendationController extends Controller
             'kabupaten tabanan|selemadeg timur' => '51.02.02.2001',
             'kabupaten tabanan|selemadeg barat' => '51.02.03.2001',
             'kabupaten tabanan|kerambitan' => '51.02.04.2001',
-            'kabupaten tabanan|tabanan' => '51.02.05.1001',
+            'kabupaten tabanan|tabanan' => '51.02.05.2001', // CODE MATI nilai lama: '51.02.05.1001' (404 BMKG)
             'kabupaten tabanan|kediri' => '51.02.06.2001',
             'kabupaten tabanan|marga' => '51.02.07.2001',
             'kabupaten tabanan|penebel' => '51.02.08.2001',
@@ -480,7 +587,7 @@ final class RecommendationController extends Controller
             'selemadeg timur' => '51.02.02.2001',
             'selemadeg barat' => '51.02.03.2001',
             'kerambitan' => '51.02.04.2001',
-            'tabanan' => '51.02.05.1001',
+            'tabanan' => '51.02.05.2001', // CODE MATI nilai lama: '51.02.05.1001' (404 BMKG)
             'kediri' => '51.02.06.2001',
             'marga' => '51.02.07.2001',
             'penebel' => '51.02.08.2001',
@@ -549,7 +656,7 @@ final class RecommendationController extends Controller
     {
         $map = [
             'kabupaten jembrana' => '51.01.01.1001',
-            'kabupaten tabanan' => '51.02.05.1001',
+            'kabupaten tabanan' => '51.02.05.2001', // CODE MATI nilai lama: '51.02.05.1001' (404 BMKG)
             'kabupaten badung' => '51.03.01.1001',
             'kabupaten gianyar' => '51.04.05.1005',
             'kabupaten klungkung' => '51.05.03.1001',
@@ -760,43 +867,130 @@ final class RecommendationController extends Controller
     /**
      * Validasi ADM4 ke API publik BMKG.
      *
-     * Ini hanya dipakai pada fallback scan, bukan pada mapping manual.
+     * Dipakai untuk semua sumber ADM4:
+     * - mapping manual,
+     * - fallback kecamatan,
+     * - fallback kabupaten,
+     * - hasil parsing halaman BMKG,
+     * - dan hasil scan kandidat.
+     *
+     * Catatan:
+     * Cache key memakai versi v2 agar tidak bentrok dengan hasil cache lama.
+     * Hasil valid disimpan lebih lama, sedangkan hasil invalid disimpan lebih
+     * pendek supaya jika BMKG sempat error sementara, sistem tidak terkunci
+     * terlalu lama pada status invalid.
      */
     private function isValidBmkgAdm4(string $adm4): bool
     {
-        return Cache::remember(
-            key: 'bmkg_adm4_valid_'.str_replace('.', '_', $adm4),
-            ttl: now()->addDays(30),
-            callback: function () use ($adm4): bool {
-                try {
-                    $response = Http::timeout(8)
-                        ->acceptJson()
-                        ->get('https://api.bmkg.go.id/publik/prakiraan-cuaca', [
-                            'adm4' => $adm4,
-                        ]);
-                } catch (Throwable) {
-                    return false;
-                }
+        $adm4 = mb_trim($adm4);
 
-                if (! $response->successful()) {
-                    return false;
-                }
+        if ($adm4 === '') {
+            return false;
+        }
 
-                try {
-                    $json = $response->json();
-                } catch (Throwable) {
-                    return false;
-                }
+        $cacheKey = 'bmkg_adm4_valid_v2_'.str_replace('.', '_', $adm4);
 
-                if (! is_array($json)) {
-                    return false;
-                }
+        $cached = Cache::get($cacheKey);
 
-                return data_get($json, 'lokasi') !== null
-                    || data_get($json, 'data.0') !== null;
-            }
+        if (is_bool($cached)) {
+            return $cached;
+        }
+
+        try {
+            $response = Http::timeout(8)
+                ->acceptJson()
+                ->get('https://api.bmkg.go.id/publik/prakiraan-cuaca', [
+                    'adm4' => $adm4,
+                ]);
+        } catch (Throwable) {
+            Cache::put($cacheKey, false, now()->addHours(6));
+
+            return false;
+        }
+
+        if (! $response->successful()) {
+            Cache::put($cacheKey, false, now()->addHours(12));
+
+            return false;
+        }
+
+        try {
+            $json = $response->json();
+        } catch (Throwable) {
+            Cache::put($cacheKey, false, now()->addHours(12));
+
+            return false;
+        }
+
+        if (! is_array($json)) {
+            Cache::put($cacheKey, false, now()->addHours(12));
+
+            return false;
+        }
+
+        $isValid = data_get($json, 'lokasi') !== null
+            || data_get($json, 'data.0') !== null;
+
+        Cache::put(
+            $cacheKey,
+            $isValid,
+            $isValid ? now()->addDays(30) : now()->addHours(12)
         );
+
+        return $isValid;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CODE MATI - isValidBmkgAdm4 lama sebelum cache valid/invalid terpisah
+    |--------------------------------------------------------------------------
+    |
+    | Logic lama sengaja DIKOMENTARKAN, bukan dihapus.
+    | Perbedaan utama:
+    | - Dulu memakai Cache::remember() dengan TTL 30 hari untuk semua hasil.
+    | - Jika API BMKG sedang error sementara, hasil false bisa tersimpan terlalu lama.
+    |
+    | Sekarang:
+    | - Cache key dibuat versi v2.
+    | - Hasil valid disimpan 30 hari.
+    | - Hasil invalid hanya disimpan 6-12 jam agar bisa pulih otomatis saat BMKG kembali normal.
+    |
+    | Potongan logic lama yang dimatikan:
+    |
+    | return Cache::remember(
+    |     key: 'bmkg_adm4_valid_'.str_replace('.', '_', $adm4),
+    |     ttl: now()->addDays(30),
+    |     callback: function () use ($adm4): bool {
+    |         try {
+    |             $response = Http::timeout(8)
+    |                 ->acceptJson()
+    |                 ->get('https://api.bmkg.go.id/publik/prakiraan-cuaca', [
+    |                     'adm4' => $adm4,
+    |                 ]);
+    |         } catch (Throwable) {
+    |             return false;
+    |         }
+    |
+    |         if (! $response->successful()) {
+    |             return false;
+    |         }
+    |
+    |         try {
+    |             $json = $response->json();
+    |         } catch (Throwable) {
+    |             return false;
+    |         }
+    |
+    |         if (! is_array($json)) {
+    |             return false;
+    |         }
+    |
+    |         return data_get($json, 'lokasi') !== null
+    |             || data_get($json, 'data.0') !== null;
+    |     }
+    | );
+    |
+    */
 
     /**
      * Simpan log jika request ke FastAPI berhasil.
