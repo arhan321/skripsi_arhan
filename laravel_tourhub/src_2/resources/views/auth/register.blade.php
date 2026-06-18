@@ -20,11 +20,13 @@
                 ></div>
 
                 <div class="relative">
-                    <div
-                        class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-slate-950 shadow-lg"
+                    <a
+                        href="{{ route('landing') }}"
+                        aria-label="Kembali ke halaman utama TourHub Bali"
+                        class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50"
                     >
                         T
-                    </div>
+                    </a>
 
                     <h1 class="mt-8 max-w-md text-4xl leading-tight font-black tracking-tight">
                         Buat akun TourHub Bali
@@ -83,11 +85,13 @@
             >
                 <div class="w-full max-w-md">
                     <div class="mb-8 text-center lg:text-left">
-                        <div
-                            class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-2xl font-black text-white shadow-lg shadow-slate-900/20 lg:mx-0"
+                        <a
+                            href="{{ route('landing') }}"
+                            aria-label="Kembali ke halaman utama TourHub Bali"
+                            class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-2xl font-black text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-blue-700 lg:mx-0"
                         >
                             T
-                        </div>
+                        </a>
 
                         <p class="text-sm font-bold tracking-wider text-blue-600 uppercase">Buat Akun Wisatawan</p>
 

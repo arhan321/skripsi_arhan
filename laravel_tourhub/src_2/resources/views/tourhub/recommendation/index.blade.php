@@ -177,16 +177,29 @@
                                     </span>
                                 </div>
 
-                                <p class="text-xs font-semibold text-slate-500">Rekomendasi Wisata CBF + CARS</p>
+                                <p class="text-xs font-semibold text-slate-500">Temukan destinasi wisata terbaik</p>
                             </div>
                         </a>
 
                         <div class="flex flex-wrap items-center gap-2 text-sm font-bold">
+                            {{--
+                                CODE MATI - Informasi endpoint ML API disembunyikan dari user awam.
+                                Alasan: URL service internal seperti FastAPI/Flask/ML API bersifat teknis
+                                dan tidak perlu ditampilkan pada halaman pengguna.
+
+                                <span
+                                    class="hidden rounded-2xl bg-slate-50 px-4 py-2.5 text-xs text-slate-600 ring-1 ring-slate-200 lg:inline-flex"
+                                >
+                                    ML API:
+                                    <span class="ml-1 text-slate-900">{{ $defaultBaseUrl ?? '-' }}</span>
+                                </span>
+                            --}}
+
                             <span
-                                class="hidden rounded-2xl bg-slate-50 px-4 py-2.5 text-xs text-slate-600 ring-1 ring-slate-200 lg:inline-flex"
+                                class="hidden items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 lg:inline-flex"
                             >
-                                ML API:
-                                <span class="ml-1 text-slate-900">{{ $defaultBaseUrl ?? '-' }}</span>
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                Sistem Rekomendasi Aktif
                             </span>
 
                             @auth
@@ -252,7 +265,7 @@
                         <div
                             class="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black text-blue-100 ring-1 ring-white/10"
                         >
-                            Machine Learning Recommendation System
+                            Panduan Wisata Cerdas TourHub
                         </div>
 
                         <h2 class="mt-5 text-3xl font-black tracking-tight text-white md:text-5xl">
@@ -327,7 +340,7 @@
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-2 text-xs font-black md:flex">
-                                        <span class="rounded-2xl bg-slate-950 px-3 py-2 text-white">CBF + CARS</span>
+                                        <span class="rounded-2xl bg-slate-950 px-3 py-2 text-white">Rekomendasi Cerdas</span>
                                         <span class="rounded-2xl bg-blue-100 px-3 py-2 text-blue-700">
                                             BMKG Otomatis
                                         </span>
@@ -1226,6 +1239,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+                            {{--
                             <div class="premium-shadow overflow-hidden rounded-3xl border border-slate-200 bg-white">
                                 <div class="h-32 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900"></div>
                                 <div class="p-5">
@@ -1255,6 +1269,76 @@
                                     <h3 class="mt-1 text-xl font-black text-slate-950">Rekreasi</h3>
                                     <p class="mt-2 text-sm leading-6 text-slate-500">
                                         Cocok untuk aktivitas keluarga dan tempat populer.
+                                    </p>
+                                </div>
+                            </div>
+                            --}}
+
+                            <div class="premium-shadow overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                                <div class="relative h-48 overflow-hidden">
+                                    <img
+                                        src="https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&w=1200&q=80"
+                                        alt="Pemandangan alam Bali"
+                                        class="h-full w-full object-cover"
+                                    />
+                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/20 to-transparent"></div>
+                                    <div class="absolute right-4 bottom-4 left-4 flex items-end justify-between gap-3">
+                                        <div>
+                                            <p class="text-xs font-black tracking-wider text-blue-200 uppercase">Kategori</p>
+                                            <h3 class="mt-1 text-2xl font-black text-white">Alam Bali</h3>
+                                        </div>
+                                        <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur">Pantai • Gunung</span>
+                                    </div>
+                                </div>
+                                <div class="p-5">
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        Cocok untuk wisata pantai, air terjun, sawah terasering, dan panorama pegunungan.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="premium-shadow overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                                <div class="relative h-48 overflow-hidden">
+                                    <img
+                                        src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1200&q=80"
+                                        alt="Wisata budaya Bali"
+                                        class="h-full w-full object-cover"
+                                    />
+                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/20 to-transparent"></div>
+                                    <div class="absolute right-4 bottom-4 left-4 flex items-end justify-between gap-3">
+                                        <div>
+                                            <p class="text-xs font-black tracking-wider text-blue-200 uppercase">Kategori</p>
+                                            <h3 class="mt-1 text-2xl font-black text-white">Budaya Bali</h3>
+                                        </div>
+                                        <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur">Pura • Sejarah</span>
+                                    </div>
+                                </div>
+                                <div class="p-5">
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        Cocok untuk pura, desa adat, pertunjukan seni, dan destinasi yang kaya nilai sejarah.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="premium-shadow overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                                <div class="relative h-48 overflow-hidden">
+                                    <img
+                                        src="https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1200&q=80"
+                                        alt="Wisata rekreasi Bali"
+                                        class="h-full w-full object-cover"
+                                    />
+                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/20 to-transparent"></div>
+                                    <div class="absolute right-4 bottom-4 left-4 flex items-end justify-between gap-3">
+                                        <div>
+                                            <p class="text-xs font-black tracking-wider text-blue-200 uppercase">Kategori</p>
+                                            <h3 class="mt-1 text-2xl font-black text-white">Rekreasi</h3>
+                                        </div>
+                                        <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur">Keluarga • Populer</span>
+                                    </div>
+                                </div>
+                                <div class="p-5">
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        Cocok untuk aktivitas keluarga, tempat populer, wisata santai, dan pengalaman hiburan.
                                     </p>
                                 </div>
                             </div>

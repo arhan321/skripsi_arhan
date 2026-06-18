@@ -10,9 +10,20 @@ use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
+/*
+|--------------------------------------------------------------------------
+| Landing Page
+|--------------------------------------------------------------------------
+|
+| Halaman utama dibuat seperti landing page/public page.
+| User umum boleh melihat landing page tanpa login.
+| Jika ingin memakai fitur rekomendasi, user tetap diarahkan login terlebih dahulu.
+|
+*/
+
 Route::get('/', function () {
-    return view('auth.login');
-});
+    return view('landing');
+})->name('landing');
 
 /*
 |--------------------------------------------------------------------------
@@ -74,13 +85,14 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/user/recommendation-history/{recommendationLog}', [UserDashboardController::class, 'show'])
         ->name('user.recommendation-history.show');
+
     /*
     |--------------------------------------------------------------------------
     | TourHub Recommendation Routes
     |--------------------------------------------------------------------------
     |
-    | Halaman simulasi rekomendasi TourHub.
-    | Diproteksi auth supaya setiap hasil rekomendasi tersimpan per user.
+    | Halaman rekomendasi TourHub.
+    | Diproteksi auth supaya hanya user login yang bisa menggunakan fitur rekomendasi.
     |
     */
 
@@ -97,4 +109,3 @@ Route::middleware('auth')->group(function (): void {
                 ->name('ml.health');
         });
 });
-
