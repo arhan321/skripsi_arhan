@@ -60,28 +60,141 @@
         }
 
         .hero-stat-card {
-            background: linear-gradient(
-                180deg,
-                rgba(255, 255, 255, 0.34) 0%,
-                rgba(255, 255, 255, 0.20) 46%,
-                rgba(15, 23, 42, 0.18) 100%
-            );
-            border: 1px solid rgba(255, 255, 255, 0.28);
+            position: relative;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 0%, rgba(59, 130, 246, 0.28), transparent 36%),
+                radial-gradient(circle at 88% 100%, rgba(20, 184, 166, 0.18), transparent 34%),
+                linear-gradient(145deg, rgba(2, 6, 23, 0.96) 0%, rgba(15, 23, 42, 0.92) 52%, rgba(30, 41, 59, 0.88) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.16);
             box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.34),
-                0 18px 38px rgba(2, 6, 23, 0.12);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
+                inset 0 1px 0 rgba(255, 255, 255, 0.16),
+                inset 0 -18px 32px rgba(15, 23, 42, 0.28),
+                0 22px 46px rgba(2, 6, 23, 0.26);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+        }
+
+        .hero-stat-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(147, 197, 253, 0.34);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                inset 0 -18px 32px rgba(15, 23, 42, 0.30),
+                0 28px 58px rgba(2, 6, 23, 0.34);
+        }
+
+        .hero-stat-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 48%, transparent 100%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 44%);
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
+        .hero-stat-card::after {
+            content: '';
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            top: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.88), rgba(45, 212, 191, 0.62), transparent);
+            opacity: 0.95;
+            pointer-events: none;
         }
 
         .hero-stat-title {
+            position: relative;
+            z-index: 1;
             color: rgba(255, 255, 255, 0.98);
-            text-shadow: 0 2px 14px rgba(2, 6, 23, 0.34);
+            text-shadow: 0 8px 22px rgba(0, 0, 0, 0.36);
         }
 
         .hero-stat-subtitle {
-            color: rgba(241, 245, 249, 0.96);
-            text-shadow: 0 1px 10px rgba(2, 6, 23, 0.38);
+            position: relative;
+            z-index: 1;
+            color: rgba(191, 219, 254, 0.96);
+            text-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+        }
+
+        .planner-mini-card {
+            position: relative;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 0%, rgba(59, 130, 246, 0.18), transparent 34%),
+                radial-gradient(circle at 82% 100%, rgba(20, 184, 166, 0.14), transparent 32%),
+                linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.92) 45%, rgba(226, 232, 240, 0.90) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.86);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                inset 0 -12px 28px rgba(148, 163, 184, 0.12),
+                0 18px 36px rgba(15, 23, 42, 0.08);
+            transition:
+                transform 260ms ease,
+                box-shadow 260ms ease,
+                border-color 260ms ease;
+        }
+
+        .planner-mini-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(147, 197, 253, 0.55);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.98),
+                inset 0 -12px 28px rgba(148, 163, 184, 0.16),
+                0 24px 48px rgba(15, 23, 42, 0.14);
+        }
+
+        .planner-mini-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.56) 46%, transparent 100%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.58) 0%, transparent 44%);
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
+        .planner-mini-card::after {
+            content: '';
+            position: absolute;
+            left: 18px;
+            right: 18px;
+            top: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.70), rgba(20, 184, 166, 0.45), transparent);
+            opacity: 0.75;
+            pointer-events: none;
+        }
+
+        .planner-mini-icon {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            height: 42px;
+            width: 42px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background:
+                linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.92));
+            border: 1px solid rgba(219, 234, 254, 0.90);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                0 12px 24px rgba(15, 23, 42, 0.08);
+            font-size: 18px;
+        }
+
+        .planner-mini-label {
+            position: relative;
+            z-index: 1;
+            color: rgba(51, 65, 85, 0.98);
+            letter-spacing: 0.02em;
         }
 
         .text-balance {
@@ -227,24 +340,24 @@
                                 tidak terlihat buyar saat berada di area gradasi putih hero.
                             --}}
 
-                            <div class="hero-stat-card rounded-3xl p-4">
+                            <div class="hero-stat-card rounded-3xl p-4 sm:p-5">
                                 <p class="hero-stat-title text-2xl font-black tracking-tight">Bali</p>
-                                <p class="hero-stat-subtitle mt-1 text-xs font-extrabold">Fokus wilayah</p>
+                                <p class="hero-stat-subtitle mt-2 text-xs font-extrabold uppercase tracking-wide">Fokus wilayah</p>
                             </div>
 
-                            <div class="hero-stat-card rounded-3xl p-4">
+                            <div class="hero-stat-card rounded-3xl p-4 sm:p-5">
                                 <p class="hero-stat-title text-2xl font-black tracking-tight">CBF</p>
-                                <p class="hero-stat-subtitle mt-1 text-xs font-extrabold">Preferensi</p>
+                                <p class="hero-stat-subtitle mt-2 text-xs font-extrabold uppercase tracking-wide">Preferensi</p>
                             </div>
 
-                            <div class="hero-stat-card rounded-3xl p-4">
+                            <div class="hero-stat-card rounded-3xl p-4 sm:p-5">
                                 <p class="hero-stat-title text-2xl font-black tracking-tight">CARS</p>
-                                <p class="hero-stat-subtitle mt-1 text-xs font-extrabold">Konteks</p>
+                                <p class="hero-stat-subtitle mt-2 text-xs font-extrabold uppercase tracking-wide">Konteks</p>
                             </div>
 
-                            <div class="hero-stat-card rounded-3xl p-4">
+                            <div class="hero-stat-card rounded-3xl p-4 sm:p-5">
                                 <p class="hero-stat-title text-2xl font-black tracking-tight">BMKG</p>
-                                <p class="hero-stat-subtitle mt-1 text-xs font-extrabold">Cuaca</p>
+                                <p class="hero-stat-subtitle mt-2 text-xs font-extrabold uppercase tracking-wide">Cuaca</p>
                             </div>
                         </div>
                     </div>
@@ -310,17 +423,27 @@
                             </div>
 
                             <div class="mt-5 grid grid-cols-3 gap-3 text-center">
-                                <div class="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                                    <p class="text-lg font-black">🎯</p>
-                                    <p class="mt-1 text-xs font-bold text-slate-500">Personal</p>
+                                {{--
+                                    Tampilan lama mini-card:
+                                    <div class="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                                        <p class="text-lg font-black">🎯</p>
+                                        <p class="mt-1 text-xs font-bold text-slate-500">Personal</p>
+                                    </div>
+                                --}}
+
+                                <div class="planner-mini-card rounded-3xl p-4">
+                                    <div class="planner-mini-icon mx-auto">🎯</div>
+                                    <p class="planner-mini-label mt-2 text-xs font-black">Personal</p>
                                 </div>
-                                <div class="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                                    <p class="text-lg font-black">🌦️</p>
-                                    <p class="mt-1 text-xs font-bold text-slate-500">Cuaca</p>
+
+                                <div class="planner-mini-card rounded-3xl p-4">
+                                    <div class="planner-mini-icon mx-auto">🌦️</div>
+                                    <p class="planner-mini-label mt-2 text-xs font-black">Cuaca</p>
                                 </div>
-                                <div class="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                                    <p class="text-lg font-black">⭐</p>
-                                    <p class="mt-1 text-xs font-bold text-slate-500">Rating</p>
+
+                                <div class="planner-mini-card rounded-3xl p-4">
+                                    <div class="planner-mini-icon mx-auto">⭐</div>
+                                    <p class="planner-mini-label mt-2 text-xs font-black">Rating</p>
                                 </div>
                             </div>
                         </div>
