@@ -83,9 +83,17 @@
 
                     @if (session('success'))
                         <div
-                            class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"
+                            class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700"
                         >
                             {{ session('success') }}
+                        </div>
+                    @endif
+
+                    @if (session('status'))
+                        <div
+                            class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700"
+                        >
+                            {{ session('status') }}
                         </div>
                     @endif
 
@@ -129,6 +137,7 @@
                                     value="{{ old('email') }}"
                                     required
                                     autofocus
+                                    autocomplete="email"
                                     class="w-full rounded-2xl border border-slate-200 bg-white py-3 pr-4 pl-12 text-sm font-semibold text-slate-900 shadow-sm transition outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                                     placeholder="email@example.com"
                                 />
@@ -150,23 +159,33 @@
                                     name="password"
                                     type="password"
                                     required
+                                    autocomplete="current-password"
                                     class="w-full rounded-2xl border border-slate-200 bg-white py-3 pr-4 pl-12 text-sm font-semibold text-slate-900 shadow-sm transition outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                                     placeholder="Masukkan password"
                                 />
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between gap-4">
+                        {{-- Remember + Forgot Password dibuat rapi dalam satu baris di dalam form --}}
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-600">
                                 <input
                                     type="checkbox"
                                     name="remember"
                                     value="1"
+                                    @checked(old('remember'))
                                     class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                 />
 
                                 <span>Ingat saya</span>
                             </label>
+
+                            <a
+                                href="{{ route('password.request') }}"
+                                class="inline-flex items-center justify-center rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-100 hover:text-blue-800"
+                            >
+                                Lupa password?
+                            </a>
                         </div>
 
                         <button
@@ -205,6 +224,26 @@
                             <p class="mt-1 text-[11px] text-slate-500">Weather</p>
                         </div>
                     </div>
+
+                    {{--
+                    |--------------------------------------------------------------------------
+                    | CODE MATI - posisi lama patch Lupa Password
+                    |--------------------------------------------------------------------------
+                    | Blok lama ini sebelumnya diletakkan di luar form dan di luar wrapper max-w-md,
+                    | sehingga tampilannya turun/berantakan di sisi kanan halaman login.
+                    | Sengaja dikomentarkan, bukan dihapus, supaya masih bisa dibandingkan.
+                    |
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-2 text-sm text-slate-600">
+                            <input type="checkbox" name="remember" class="rounded border-slate-300" />
+                            Ingat saya
+                        </label>
+
+                        <a href="{{ route('password.request') }}" class="text-sm font-bold text-blue-700 hover:text-blue-800">
+                            Lupa password?
+                        </a>
+                    </div>
+                    --}}
                 </div>
             </section>
         </div>
