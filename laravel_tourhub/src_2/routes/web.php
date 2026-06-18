@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\User\ProfileController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\User\UserDashboardController;
 use App\Http\Controllers\Web\RecommendationController;
@@ -86,6 +87,15 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/user/recommendation-history/{recommendationLog}', [UserDashboardController::class, 'show'])
         ->name('user.recommendation-history.show');
 
+    Route::get('/user/profile', [ProfileController::class, 'edit'])
+    ->name('user.profile.edit');
+
+Route::put('/user/profile', [ProfileController::class, 'update'])
+    ->name('user.profile.update');
+
+Route::patch('/user/profile', [ProfileController::class, 'update'])
+    ->name('user.profile.patch');
+
     /*
     |--------------------------------------------------------------------------
     | TourHub Recommendation Routes
@@ -109,3 +119,4 @@ Route::middleware('auth')->group(function (): void {
                 ->name('ml.health');
         });
 });
+

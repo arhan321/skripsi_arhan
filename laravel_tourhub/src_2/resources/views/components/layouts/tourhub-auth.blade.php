@@ -11,16 +11,8 @@
         <header class="border-b border-slate-200 bg-white">
             <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
                 {{--
-                    BRAND / LOGO NAVBAR AUTH
-
-                    Sebelumnya:
-                    href="{{ route('user.dashboard') }}"
-
-                    Sekarang:
-                    href="{{ route('landing') }}"
-
-                    Jadi ketika tulisan "TourHub Bali" di navbar login/register diklik,
-                    user langsung diarahkan ke landing page utama.
+                    Brand TourHub Bali.
+                    Saat diklik, user diarahkan ke landing page utama.
                 --}}
                 <a
                     href="{{ route('landing') }}"
@@ -33,16 +25,28 @@
                     @auth
                         <a
                             href="{{ route('tourhub.recommendation.index') }}"
-                            class="text-slate-600 transition hover:text-slate-950"
+                            class="{{ request()->routeIs('tourhub.recommendation.*') ? 'font-bold text-blue-700' : 'text-slate-600' }} transition hover:text-slate-950"
                         >
                             Rekomendasi
                         </a>
 
                         <a
                             href="{{ route('user.dashboard') }}"
-                            class="text-slate-600 transition hover:text-slate-950"
+                            class="{{ request()->routeIs('user.dashboard') ? 'font-bold text-blue-700' : 'text-slate-600' }} transition hover:text-slate-950"
                         >
                             Dashboard
+                        </a>
+
+                        {{--
+                            Menu Profile User.
+                            Route ini harus tersedia:
+                            GET /user/profile -> name('user.profile.edit')
+                        --}}
+                        <a
+                            href="{{ route('user.profile.edit') }}"
+                            class="{{ request()->routeIs('user.profile.*') ? 'font-bold text-blue-700' : 'text-slate-600' }} transition hover:text-slate-950"
+                        >
+                            Profile
                         </a>
 
                         <form method="POST" action="{{ route('user.logout') }}">
@@ -58,7 +62,7 @@
                     @else
                         <a
                             href="{{ route('user.login') }}"
-                            class="text-slate-600 transition hover:text-slate-950"
+                            class="{{ request()->routeIs('user.login') || request()->routeIs('login') ? 'font-bold text-blue-700' : 'text-slate-600' }} transition hover:text-slate-950"
                         >
                             Login
                         </a>
