@@ -158,7 +158,7 @@
                 $bmkgForecastIntervalText = 'Update prakiraan per 3 jam';
             @endphp
 
-            {{-- Top Navigation: Travel app style --}}
+            {{-- Top Navigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
             <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
                 <div class="mx-auto max-w-7xl px-6">
                     <div class="flex min-h-[72px] flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
@@ -225,6 +225,13 @@
                             </a>
 
                             @auth
+                                <a
+                                    href="{{ route('user.profile.edit') }}"
+                                    class="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-2.5 text-slate-700 ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:bg-slate-200"
+                                >
+                                    Profile
+                                </a>
+
                                 <form method="POST" action="{{ route('user.logout') }}">
                                     @csrf
 
