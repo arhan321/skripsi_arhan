@@ -211,28 +211,88 @@
                 }
 
                 // Cuaca tidak lagi dipilih manual oleh user.
-                // Nilai ini hanya sebagai fallback jika BMKG gagal/tidak tersedia.
-                $selectedWeather = 'cerah';
+                // Nilai ini hanya sebagai fallback jika Otomatis gagal/tidak tersedia.
+                $selectedCuaca = 'cerah';
 
                 $selectedVisitDay = old('visit_day', data_get($payload ?? [], 'visit_day', 'weekday'));
 
                 $isHighSeason = old('is_high_season', data_get($payload ?? [], 'is_high_season', false));
 
-                // BMKG dibuat aktif otomatis agar user tidak perlu memilih cuaca manual.
+                // Otomatis dibuat aktif otomatis agar user tidak perlu memilih cuaca manual.
                 $useBmkg = true;
 
                 $selectedKategoriArray = (array) $selectedKategori;
 
                 /*
-                 * Keterangan periode BMKG untuk ditampilkan di UI.
-                 * BMKG data terbuka prakiraan cuaca tersedia dalam format 3 harian,
+                 * Keterangan periode Otomatis untuk ditampilkan di UI.
+                 * Otomatis data terbuka prakiraan cuaca tersedia dalam format 3 harian,
                  * dengan 8 data per hari atau interval sekitar 3 jam.
                  */
-                $bmkgForecastPeriodText = 'Prakiraan BMKG ±3 hari ke depan';
-                $bmkgForecastIntervalText = 'Update prakiraan per 3 jam';
+                $bmkgForecastPeriodText = 'Info cuaca beberapa hari ke depan';
+                $bmkgForecastIntervalText = 'Cuaca diperbarui berkala';
+
+
+                /*
+                 * Label user-friendly untuk mengganti angka teknis.
+                 * Angka internal tetap dipakai sistem untuk pengurutan,
+                 * tetapi user cukup melihat status yang mudah dipahami.
+                 */
+                $labelRekomendasi = function ($item, int $index = 0): string {
+                    if ($index === 0) {
+                        return 'Paling Cocok';
+                    }
+
+                    $score = (float) data_get($item, 'final_score', 0);
+
+                    if ($score >= 0.75) {
+                        return 'Sangat Cocok';
+                    }
+
+                    if ($score >= 0.45) {
+                        return 'Cocok';
+                    }
+
+                    return 'Cukup Cocok';
+                };
+
+                $labelKesesuaian = function ($item): string {
+                    $score = (float) data_get($item, 'cbf_score', 0);
+
+                    if ($score >= 0.70) {
+                        return 'Sangat Sesuai';
+                    }
+
+                    if ($score >= 0.40) {
+                        return 'Sesuai';
+                    }
+
+                    if ($score > 0) {
+                        return 'Cukup Sesuai';
+                    }
+
+                    return 'Sesuai Pilihan';
+                };
+
+                $labelKondisi = function ($item): string {
+                    $nilai = (float) data_get($item, 'context_multiplier', 1);
+
+                    if ($nilai >= 1.08) {
+                        return 'Sangat Mendukung';
+                    }
+
+                    if ($nilai >= 1.00) {
+                        return 'Mendukung';
+                    }
+
+                    if ($nilai >= 0.90) {
+                        return 'Cukup Mendukung';
+                    }
+
+                    return 'Perlu Dipertimbangkan';
+                };
             @endphp
 
-            {{-- Top Navigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
+            {{-- Jumlah Hasilavigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
             <header class="tourhub-nav-glass sticky top-0 z-50 border-b border-white/80 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
                 <div class="mx-auto max-w-7xl px-4 sm:px-6">
                     <div class="flex min-h-[76px] items-center justify-between gap-3 py-3">
@@ -262,14 +322,14 @@
 
                         <div class="hidden items-center gap-2 text-sm font-bold lg:flex">
                             {{--
-                                CODE MATI - Informasi endpoint ML API disembunyikan dari user awam.
-                                Alasan: URL service internal seperti FastAPI/Flask/ML API bersifat teknis
+                                CODE MATI - Informasi endpoint layanan rekomendasi disembunyikan dari user awam.
+                                Alasan: URL service internal seperti layanan rekomendasi/Flask/layanan rekomendasi bersifat teknis
                                 dan tidak perlu ditampilkan pada halaman pengguna.
 
                                 <span
                                     class="hidden rounded-2xl bg-slate-50 px-4 py-2.5 text-xs text-slate-600 ring-1 ring-slate-200 lg:inline-flex"
                                 >
-                                    ML API:
+                                    layanan rekomendasi:
                                     <span class="ml-1 text-slate-900">{{ $defaultBaseUrl ?? '-' }}</span>
                                 </span>
                             --}}
@@ -399,10 +459,10 @@
                         <a href="#search" data-scroll-link class="nav-scroll-link is-active whitespace-nowrap">
                             Rekomendasi
                         </a>
-                        <a href="#hasil" data-scroll-link class="nav-scroll-link whitespace-nowrap">Hasil Ranking</a>
+                        <a href="#hasil" data-scroll-link class="nav-scroll-link whitespace-nowrap">Hasil Terbaik</a>
                         <a href="#kategori" data-scroll-link class="nav-scroll-link whitespace-nowrap">Kategori</a>
-                        <a href="#bmkg" data-scroll-link class="nav-scroll-link whitespace-nowrap">Cuaca BMKG</a>
-                        <a href="#log" data-scroll-link class="nav-scroll-link whitespace-nowrap">Aktivitas Terbaru</a>
+                        <a href="#bmkg" data-scroll-link class="nav-scroll-link whitespace-nowrap">Cuaca Terkini</a>
+                        <a href="#log" data-scroll-link class="nav-scroll-link whitespace-nowrap">Riwayat Terbaru</a>
                     </nav>
                 </div>
             </header>
@@ -473,7 +533,7 @@
 
                             <div class="rounded-3xl bg-white/10 px-3 py-4 ring-1 ring-white/10 backdrop-blur">
                                 <div class="text-2xl">🏆</div>
-                                <div class="mt-2">Top-N</div>
+                                <div class="mt-2">Pilihan</div>
                             </div>
                         </div>
 
@@ -482,21 +542,20 @@
                                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                     <div>
                                         <p class="text-xs font-black tracking-wider text-blue-600 uppercase">
-                                            Travel Planner
+                                            Rencana Wisata
                                         </p>
                                         <h3 class="mt-1 text-2xl font-black tracking-tight text-slate-950">
                                             Mau liburan ke mana?
                                         </h3>
                                         <p class="mt-1 text-sm text-slate-600">
-                                            Isi parameter rekomendasi, lalu sistem akan menghitung ranking destinasi
-                                            terbaik.
+                                            Isi pilihan wisatamu, lalu TourHub akan mencarikan destinasi yang paling sesuai.
                                         </p>
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-2 text-xs font-black md:flex">
                                         <span class="rounded-2xl bg-slate-950 px-3 py-2 text-white">Rekomendasi Cerdas</span>
                                         <span class="rounded-2xl bg-blue-100 px-3 py-2 text-blue-700">
-                                            BMKG Otomatis
+                                            Cuaca Otomatis
                                         </span>
                                     </div>
                                 </div>
@@ -589,7 +648,7 @@
                                                 for="lokasi_wisata"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
                                             >
-                                                PILIH DAERAH kabupaten/kota dan kecamatan
+                                                Pilih Daerah Wisata
                                             </label>
 
                                             <select
@@ -638,7 +697,7 @@
                                                 for="keywords"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
                                             >
-                                                Keywords
+                                                Kata Kunci
                                             </label>
 
                                             <input
@@ -658,7 +717,7 @@
                                                 for="min_rating"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
                                             >
-                                                Min Rating
+                                                Rating Minimal
                                             </label>
 
                                             <input
@@ -678,7 +737,7 @@
                                                 for="top_n"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
                                             >
-                                                Top N
+                                                Jumlah Hasil
                                             </label>
 
                                             <input
@@ -705,10 +764,9 @@
                                                 <div class="flex items-start gap-3">
                                                     <span class="text-xl">🌤️</span>
                                                     <div>
-                                                        <p class="font-black text-slate-950">Otomatis dari BMKG</p>
+                                                        <p class="font-black text-slate-950">Otomatis dari Otomatis</p>
                                                         <p class="mt-1 text-xs font-medium leading-5 text-slate-500">
-                                                            Default sistem adalah cerah. Jika BMKG mendeteksi hujan,
-                                                            CARS otomatis memprioritaskan destinasi indoor atau mixed.
+                                                            Cuaca akan dibaca otomatis. Jika cuaca kurang mendukung, TourHub akan mengutamakan tempat wisata yang lebih nyaman.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -751,7 +809,7 @@
                                                 </span>
                                                 <span>
                                                     <span class="block text-sm font-black text-slate-900">
-                                                        BMKG Otomatis
+                                                        Cuaca Otomatis
                                                     </span>
                                                     <span class="text-xs leading-5 text-slate-500">
                                                         Sistem mengambil prakiraan cuaca otomatis berdasarkan wilayah
@@ -763,7 +821,7 @@
                                             <span class="flex items-center gap-2">
                                                 <input type="hidden" name="use_bmkg" value="1" />
                                                 <span class="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">
-                                                    Aktif Otomatis
+                                                    Aktif
                                                 </span>
                                             </span>
                                         </label>
@@ -779,10 +837,10 @@
                                                 </span>
                                                 <span>
                                                     <span class="block text-sm font-black text-slate-900">
-                                                        High Season
+                                                        Musim Ramai
                                                     </span>
                                                     <span class="text-xs leading-5 text-slate-500">
-                                                        Simulasi kondisi ramai wisatawan.
+                                                        Tandai jika kamu berkunjung saat musim liburan atau akhir pekan panjang.
                                                     </span>
                                                 </span>
                                             </span>
@@ -802,18 +860,15 @@
                                         <div
                                             class="rounded-3xl border border-blue-200 bg-white p-4 text-xs leading-5 text-blue-800 lg:col-span-4"
                                         >
-                                            <p class="font-black text-blue-900">Catatan BMKG</p>
+                                            <p class="font-black text-blue-900">Catatan Otomatis</p>
                                             <p class="mt-1">
-                                                User tidak perlu mengisi kode ADM4. Sistem akan menentukan ADM4 secara
-                                                otomatis dari lokasi yang dipilih.
+                                                Cuaca akan disesuaikan otomatis berdasarkan daerah wisata yang kamu pilih.
                                             </p>
 
                                             <div class="mt-3 rounded-2xl bg-blue-50 px-3 py-2 ring-1 ring-blue-100">
                                                 <p class="font-black text-blue-900">{{ $bmkgForecastPeriodText }}</p>
                                                 <p class="mt-1 text-[11px] leading-5 text-blue-700">
-                                                    Data prakiraan cuaca BMKG bersifat 3 harian dengan interval sekitar
-                                                    3 jam. Di sistem ini, cuaca dipakai sebagai konteks CARS. Jika
-                                                    hujan terdeteksi, sistem memprioritaskan destinasi indoor atau mixed.
+                                                    Informasi cuaca membantu TourHub menampilkan tempat wisata yang lebih nyaman untuk dikunjungi.
                                                 </p>
                                             </div>
                                         </div>
@@ -867,7 +922,7 @@
                                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                                     <div>
                                         <p class="text-xs font-black tracking-wider text-blue-600 uppercase">
-                                            Promo terbaik buat liburan irit!
+                                            Pilihan terbaik untuk liburanmu
                                         </p>
 
                                         <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
@@ -875,37 +930,21 @@
                                         </h2>
 
                                         <p class="mt-2 text-sm leading-6 text-slate-600">
-                                            Hasil ini sudah diurutkan berdasarkan final score tertinggi. Ranking #1
-                                            adalah destinasi paling direkomendasikan.
+                                            Hasil ini sudah diurutkan dari destinasi yang paling sesuai dengan pilihanmu.
                                         </p>
 
                                         <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
                                             <span class="rounded-full bg-slate-950 px-3 py-1 text-white">
                                                 Cuaca: {{ data_get($result, 'weather_used') ?? '-' }}
                                             </span>
-
-                                            <span class="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
-                                                Sumber Cuaca: {{ data_get($result, 'weather_source') ?? '-' }}
+<span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                                                Pilihan tersedia
                                             </span>
-
-                                            @if (str_contains(strtolower((string) data_get($result, 'weather_source', '')), 'bmkg'))
-                                                <span class="rounded-full bg-cyan-100 px-3 py-1 text-cyan-700">
-                                                    {{ $bmkgForecastPeriodText }} · {{ $bmkgForecastIntervalText }}
-                                                </span>
-                                            @endif
-
-                                            <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
-                                                Candidates: {{ data_get($result, 'total_candidates') ?? '-' }}
-                                            </span>
-
-                                            <span class="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
-                                                Response: {{ $responseTimeMs ?? '-' }} ms
-                                            </span>
-                                        </div>
+</div>
 
                                         @if (strtolower((string) data_get($result, 'weather_used')) === 'hujan')
                                             <div class="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-                                                🌧️ BMKG mendeteksi potensi hujan pada wilayah ini. Sistem otomatis
+                                                🌧️ Otomatis mendeteksi potensi hujan pada wilayah ini. Sistem otomatis
                                                 memprioritaskan destinasi indoor atau mixed agar perjalanan lebih nyaman.
                                             </div>
                                         @endif
@@ -913,12 +952,12 @@
 
                                     <div class="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-slate-200">
                                         <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">
-                                            Total Output
+                                            Pilihan Wisata
                                         </p>
                                         <p class="mt-1 text-3xl font-black text-slate-950">
                                             {{ $recommendations->count() }}
                                         </p>
-                                        <p class="text-xs font-bold text-blue-700">Top Destinasi</p>
+                                        <p class="text-xs font-bold text-blue-700">Pilihan Wisata</p>
                                     </div>
                                 </div>
                             </div>
@@ -958,7 +997,7 @@
                                                     <p
                                                         class="text-xs font-black tracking-wider text-blue-100 uppercase"
                                                     >
-                                                        Final Score Tertinggi
+                                                        Paling Sesuai
                                                     </p>
                                                     <div class="mt-2 flex items-end justify-between gap-4">
                                                         <div>
@@ -973,9 +1012,9 @@
                                                         <div
                                                             class="rounded-3xl bg-white/90 px-5 py-3 text-right text-slate-950 backdrop-blur-xl"
                                                         >
-                                                            <p class="text-xs font-bold text-slate-500">Score</p>
-                                                            <p class="text-3xl font-black">
-                                                                {{ data_get($bestRecommendation, 'final_score') }}
+                                                            <p class="text-xs font-bold text-slate-500">Status</p>
+                                                            <p class="text-lg font-black leading-tight">
+                                                                {{ $labelRekomendasi($bestRecommendation, 0) }}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -991,7 +1030,7 @@
                                                             <span
                                                                 class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700"
                                                             >
-                                                                Rank #1
+                                                                Pilihan Utama
                                                             </span>
 
                                                             <span
@@ -1052,10 +1091,10 @@
                                                         <p
                                                             class="text-xs font-bold tracking-wide text-slate-500 uppercase"
                                                         >
-                                                            CBF
+                                                            Kesesuaian
                                                         </p>
                                                         <p class="mt-1 text-xl font-black text-slate-950">
-                                                            {{ data_get($bestRecommendation, 'cbf_score') }}
+                                                            {{ $labelKesesuaian($bestRecommendation) }}
                                                         </p>
                                                     </div>
 
@@ -1063,10 +1102,10 @@
                                                         <p
                                                             class="text-xs font-bold tracking-wide text-slate-500 uppercase"
                                                         >
-                                                            Context
+                                                            Kondisi Kunjungan
                                                         </p>
                                                         <p class="mt-1 text-xl font-black text-slate-950">
-                                                            {{ data_get($bestRecommendation, 'context_multiplier') }}
+                                                            {{ $labelKondisi($bestRecommendation) }}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1080,10 +1119,9 @@
 
                                                     <p class="mt-2 text-sm leading-6 text-slate-700">
                                                         Destinasi ini memiliki
-                                                        <strong>final score tertinggi</strong>
-                                                        dibanding kandidat lainnya. Final score dihitung dari kecocokan
-                                                        CBF, kualitas rating, jumlah ulasan, dan penyesuaian konteks
-                                                        CARS.
+                                                        <strong>paling sesuai</strong>
+                                                        dibanding pilihan lainnya. Nilai ini dihitung dari kesesuaian preferensi,
+                                                        rating, jumlah ulasan, dan kondisi kunjungan.
                                                     </p>
 
                                                     @if (data_get($bestRecommendation, 'alasan'))
@@ -1102,10 +1140,10 @@
                                         <p class="text-xs font-black tracking-wider text-slate-500 uppercase">
                                             Aktivitas Trending
                                         </p>
-                                        <h3 class="text-2xl font-black text-slate-950">Semua Kandidat Rekomendasi</h3>
+                                        <h3 class="text-2xl font-black text-slate-950">Semua Pilihan Wisata</h3>
                                     </div>
 
-                                    <p class="text-sm text-slate-500">Diurutkan dari final score tertinggi.</p>
+                                    <p class="text-sm text-slate-500">Diurutkan dari paling sesuai.</p>
                                 </div>
 
                                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -1135,7 +1173,7 @@
                                                 <div
                                                     class="{{ $index === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-950/90 text-white' }} absolute top-4 left-4 rounded-2xl px-3 py-2 text-sm font-black backdrop-blur"
                                                 >
-                                                    #{{ $index + 1 }}
+                                                    {{ $index === 0 ? 'Pilihan Utama' : 'Pilihan Lain' }}
                                                 </div>
 
                                                 @if ($index === 0)
@@ -1147,9 +1185,9 @@
                                                 @endif
 
                                                 <div class="absolute right-4 bottom-4 left-4">
-                                                    <p class="text-xs font-bold text-blue-100">Final Score</p>
-                                                    <p class="text-3xl font-black text-white">
-                                                        {{ data_get($item, 'final_score') }}
+                                                    <p class="text-xs font-bold text-blue-100">Status</p>
+                                                    <p class="text-2xl font-black text-white">
+                                                        {{ $labelRekomendasi($item, $index) }}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1215,10 +1253,10 @@
                                                         <p
                                                             class="text-xs font-bold tracking-wide text-slate-500 uppercase"
                                                         >
-                                                            CBF
+                                                            Kesesuaian
                                                         </p>
                                                         <p class="mt-1 text-lg font-black text-slate-950">
-                                                            {{ data_get($item, 'cbf_score') }}
+                                                            {{ $labelKesesuaian($item) }}
                                                         </p>
                                                     </div>
 
@@ -1226,10 +1264,10 @@
                                                         <p
                                                             class="text-xs font-bold tracking-wide text-slate-500 uppercase"
                                                         >
-                                                            Context
+                                                            Kondisi Kunjungan
                                                         </p>
                                                         <p class="mt-1 text-lg font-black text-slate-950">
-                                                            {{ data_get($item, 'context_multiplier') }}
+                                                            {{ $labelKondisi($item) }}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1268,11 +1306,11 @@
                                             </div>
 
                                             <h3 class="mt-4 text-xl font-black text-slate-950">
-                                                Tidak ada rekomendasi
+                                                Belum ada pilihan wisata
                                             </h3>
 
                                             <p class="mt-2 text-sm text-slate-500">
-                                                Coba kosongkan keyword, turunkan min rating, atau pilih semua kategori.
+                                                Coba kosongkan kata kunci, turunkan rating minimal, atau pilih beberapa kategori.
                                             </p>
                                         </div>
                                     @endforelse
@@ -1280,36 +1318,7 @@
                             </div>
                         </div>
 
-                        {{-- JSON Debug --}}
-                        <details class="premium-shadow overflow-hidden rounded-3xl border border-slate-200 bg-white">
-                            <summary
-                                class="cursor-pointer border-b border-slate-100 bg-slate-50 px-6 py-4 text-sm font-black text-slate-950"
-                            >
-                                Lihat JSON Request & Response
-                            </summary>
-
-                            <div class="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
-                                <div>
-                                    <p class="mb-2 text-sm font-black text-slate-900">Request ke FastAPI</p>
-
-                                    <pre
-                                        class="max-h-[480px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100"
-                                    >
-{{ json_encode($payload ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
-                                    >
-                                </div>
-
-                                <div>
-                                    <p class="mb-2 text-sm font-black text-slate-900">Response FastAPI</p>
-
-                                    <pre
-                                        class="max-h-[480px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100"
-                                    >
-{{ json_encode($result ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre
-                                    >
-                                </div>
-                            </div>
-                        </details>
+                        {{-- Area teknis pengembang disembunyikan dari user biasa. --}}
                     @else
                         {{-- Empty State: Traveloka-like content rows --}}
                         <div class="premium-shadow overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
@@ -1326,8 +1335,7 @@
                                     </h2>
 
                                     <p class="mt-3 text-sm leading-6 text-slate-600">
-                                        Isi parameter pada kotak pencarian di atas untuk mendapatkan rekomendasi wisata
-                                        Bali. Hasilnya akan langsung disimpan ke riwayat user kamu.
+                                        Isi pilihan wisata pada kotak pencarian di atas untuk mendapatkan rekomendasi Bali. Hasilnya akan langsung tersimpan di riwayat akunmu.
                                     </p>
 
                                     <div class="mt-6 grid grid-cols-1 gap-3">
@@ -1346,7 +1354,7 @@
                                         <div class="rounded-2xl bg-slate-50 p-4">
                                             <p class="font-black text-slate-900">3. Klik cari</p>
                                             <p class="mt-1 text-sm text-slate-500">
-                                                Sistem akan menghitung CBF + CARS.
+                                                Sistem akan menghitung Rekomendasi Pintar.
                                             </p>
                                         </div>
                                     </div>
@@ -1358,33 +1366,32 @@
                                     <div class="soft-grid absolute inset-0 opacity-20"></div>
                                     <div class="relative flex h-full flex-col justify-between">
                                         <div>
-                                            <p class="text-sm font-bold text-blue-200">TourHub Insight</p>
-                                            <h3 class="mt-3 text-4xl font-black">CBF + CARS</h3>
+                                            <p class="text-sm font-bold text-blue-200">Panduan TourHub</p>
+                                            <h3 class="mt-3 text-4xl font-black">Rekomendasi Pintar</h3>
                                             <p class="mt-3 text-sm leading-6 text-slate-300">
-                                                Ranking destinasi dipengaruhi oleh kecocokan preferensi, rating,
-                                                popularitas, dan konteks seperti cuaca.
+                                                Rekomendasi dibuat berdasarkan pilihan wisata, rating, popularitas, lokasi, dan kondisi cuaca.
                                             </p>
                                         </div>
 
                                         <div class="grid grid-cols-2 gap-3">
                                             <div class="rounded-2xl bg-white/10 p-4 backdrop-blur">
-                                                <p class="text-xs text-slate-300">CBF</p>
-                                                <p class="mt-1 font-black">Similarity</p>
+                                                <p class="text-xs text-slate-300">Kesesuaian</p>
+                                                <p class="mt-1 font-black">Kesesuaian</p>
                                             </div>
 
                                             <div class="rounded-2xl bg-white/10 p-4 backdrop-blur">
-                                                <p class="text-xs text-slate-300">CARS</p>
-                                                <p class="mt-1 font-black">Context</p>
+                                                <p class="text-xs text-slate-300">Kondisi Perjalanan</p>
+                                                <p class="mt-1 font-black">Kondisi Kunjungan</p>
                                             </div>
 
                                             <div class="rounded-2xl bg-white/10 p-4 backdrop-blur">
-                                                <p class="text-xs text-slate-300">Weather</p>
-                                                <p class="mt-1 font-black">BMKG</p>
+                                                <p class="text-xs text-slate-300">Cuaca</p>
+                                                <p class="mt-1 font-black">Otomatis</p>
                                             </div>
 
                                             <div class="rounded-2xl bg-white/10 p-4 backdrop-blur">
-                                                <p class="text-xs text-slate-300">Output</p>
-                                                <p class="mt-1 font-black">Top-N</p>
+                                                <p class="text-xs text-slate-300">Hasil</p>
+                                                <p class="mt-1 font-black">Pilihan</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1509,15 +1516,15 @@
                         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p class="text-xs font-black tracking-wider text-slate-500 uppercase">
-                                    Aktivitas Terbaru
+                                    Riwayat Terbaru
                                 </p>
 
                                 <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                                    Log Rekomendasi Terbaru
+                                    Riwayat Pencarian Terbaru
                                 </h2>
 
                                 <p class="mt-2 text-sm text-slate-600">
-                                    Data ini tersimpan sebagai riwayat rekomendasi milik user yang sedang login.
+                                    Pencarian yang kamu lakukan akan tersimpan di riwayat akunmu.
                                 </p>
                             </div>
 
@@ -1539,9 +1546,9 @@
                                     <th class="px-6 py-4">Waktu</th>
                                     <th class="px-6 py-4">Status</th>
                                     <th class="px-6 py-4">Cuaca</th>
-                                    <th class="px-6 py-4">Candidates</th>
-                                    <th class="px-6 py-4">Top Destination</th>
-                                    <th class="px-6 py-4">Response</th>
+                                    <th class="px-6 py-4">Pilihan</th>
+                                    <th class="px-6 py-4">Destinasi Teratas</th>
+                                    
                                 </tr>
                             </thead>
 
@@ -1561,7 +1568,7 @@
                                             <span
                                                 class="{{ $log->status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }} inline-flex rounded-full px-3 py-1 text-xs font-black"
                                             >
-                                                {{ ucfirst($log->status) }}
+                                                {{ $log->status === 'success' ? 'Berhasil' : 'Belum Berhasil' }}
                                             </span>
                                         </td>
 
@@ -1569,10 +1576,7 @@
                                             <div class="font-bold text-slate-900">
                                                 {{ $log->weather_used ?? '-' }}
                                             </div>
-                                            <div class="text-xs text-slate-500">
-                                                {{ $log->weather_source ?? 'manual' }}
-                                            </div>
-                                        </td>
+</td>
 
                                         <td class="px-6 py-4 font-bold text-slate-900">
                                             {{ $log->total_candidates ?? '-' }}
@@ -1584,13 +1588,11 @@
                                             </div>
                                         </td>
 
-                                        <td class="px-6 py-4 font-medium text-slate-600">
-                                            {{ $log->response_time_ms ? $log->response_time_ms . ' ms' : '-' }}
-                                        </td>
+                                        
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-12 text-center">
+                                        <td colspan="5" class="px-6 py-12 text-center">
                                             <div
                                                 class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-2xl"
                                             >
@@ -1600,7 +1602,7 @@
                                             <h3 class="mt-4 font-black text-slate-950">Belum ada log rekomendasi</h3>
 
                                             <p class="mt-1 text-sm text-slate-500">
-                                                Setelah submit form, log akan tampil di sini.
+                                                Setelah mencari rekomendasi, riwayat akan tampil di sini.
                                             </p>
                                         </td>
                                     </tr>
