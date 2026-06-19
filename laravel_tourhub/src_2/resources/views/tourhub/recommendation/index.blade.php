@@ -164,11 +164,80 @@
                 transform: translateY(-2px);
             }
 
+            .tourhub-reason-content {
+                display: block;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: normal;
+                transition:
+                    max-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
+                    opacity 220ms ease;
+            }
+
+            .tourhub-reason-content.is-collapsible {
+                position: relative;
+                max-height: 5.65rem;
+                overflow: hidden;
+            }
+
+            .tourhub-reason-content.is-collapsible::after {
+                content: '';
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                height: 2.4rem;
+                background: linear-gradient(to bottom, rgba(248, 250, 252, 0), rgb(248, 250, 252));
+                pointer-events: none;
+                transition: opacity 240ms ease;
+            }
+
+            .tourhub-reason-content.is-expanded::after {
+                opacity: 0;
+            }
+
+            .tourhub-reason-button {
+                margin-top: 0.75rem;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.4rem;
+                border-radius: 9999px;
+                background: rgb(219, 234, 254);
+                padding: 0.5rem 0.85rem;
+                font-size: 0.75rem;
+                font-weight: 900;
+                color: rgb(29, 78, 216);
+                box-shadow: 0 8px 22px rgba(37, 99, 235, 0.08);
+                transition:
+                    transform 200ms ease,
+                    background-color 200ms ease,
+                    box-shadow 200ms ease;
+            }
+
+            .tourhub-reason-button:hover {
+                transform: translateY(-1px);
+                background: rgb(191, 219, 254);
+                box-shadow: 0 12px 28px rgba(37, 99, 235, 0.13);
+            }
+
+            .tourhub-reason-button span {
+                transition: transform 220ms ease;
+            }
+
+            .tourhub-reason-button.is-expanded span {
+                transform: rotate(180deg);
+            }
+
             @media (prefers-reduced-motion: reduce) {
                 .tourhub-mobile-menu-panel,
                 .tourhub-menu-line,
                 .tourhub-menu-button,
-                .tourhub-primary-action {
+                .tourhub-primary-action,
+                .tourhub-reason-content,
+                .tourhub-reason-content::after,
+                .tourhub-reason-button,
+                .tourhub-reason-button span {
                     transition: none !important;
                 }
             }
@@ -289,6 +358,40 @@
                     }
 
                     return 'Perlu Dipertimbangkan';
+                };
+
+                $cleanReason = function ($reason): string {
+                    $reason = trim((string) $reason);
+
+                    if ($reason === '') {
+                        return '';
+                    }
+
+                    // Bersihkan angka dan istilah teknis agar alasan nyaman dibaca user biasa.
+                    $reason = preg_replace('/\s*\(\s*CBF\s*=\s*[^\)]*\)/i', '', $reason);
+                    $reason = preg_replace('/\s*CBF\s*=\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*context\s*=\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*final score\s*[^;\.]*[;\.]?/i', '', $reason);
+
+                    $reason = str_ireplace('cocok dengan fitur/preferensi user', 'Cocok dengan preferensi pencarianmu', $reason);
+                    $reason = str_ireplace('fitur/preferensi user', 'preferensi pencarianmu', $reason);
+                    $reason = str_ireplace('user', 'kamu', $reason);
+                    $reason = str_ireplace('outdoor', 'luar ruangan', $reason);
+                    $reason = str_ireplace('indoor', 'dalam ruangan', $reason);
+                    $reason = str_ireplace('mixed', 'fleksibel', $reason);
+                    $reason = str_ireplace('weekend', 'akhir pekan', $reason);
+                    $reason = str_ireplace('weekday', 'hari biasa', $reason);
+
+                    $reason = preg_replace('/\s+/', ' ', $reason);
+                    $reason = preg_replace('/\s*;\s*/', '; ', $reason);
+                    $reason = preg_replace('/;\s*;/', ';', $reason);
+                    $reason = trim($reason, " ;.\t\n\r\0\x0B");
+
+                    return $reason !== '' ? ucfirst($reason) . '.' : '';
+                };
+
+                $shouldShowReasonToggle = function (?string $reason): bool {
+                    return mb_strlen(strip_tags((string) $reason)) > 135;
                 };
             @endphp
 
@@ -1124,9 +1227,13 @@
                                                         rating, jumlah ulasan, dan kondisi kunjungan.
                                                     </p>
 
-                                                    @if (data_get($bestRecommendation, 'alasan'))
+                                                    @php
+                                                        $bestReason = $cleanReason(data_get($bestRecommendation, 'alasan'));
+                                                    @endphp
+
+                                                    @if ($bestReason)
                                                         <p class="mt-3 text-sm leading-6 text-slate-700">
-                                                            {{ data_get($bestRecommendation, 'alasan') }}
+                                                            {{ $bestReason }}
                                                         </p>
                                                     @endif
                                                 </div>
@@ -1272,17 +1379,40 @@
                                                     </div>
                                                 </div>
 
-                                                <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                                    <p
-                                                        class="text-xs font-black tracking-wider text-slate-500 uppercase"
-                                                    >
-                                                        Alasan
-                                                    </p>
+                                                @php
+                                                    $itemReason = $cleanReason(data_get($item, 'alasan'));
+                                                    $needsToggle = $shouldShowReasonToggle($itemReason);
+                                                @endphp
 
-                                                    <p class="mt-2 line-clamp-4 text-sm leading-6 text-slate-700">
-                                                        {{ data_get($item, 'alasan') }}
-                                                    </p>
-                                                </div>
+                                                @if ($itemReason)
+                                                    <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                                        <p
+                                                            class="text-xs font-black tracking-wider text-slate-500 uppercase"
+                                                        >
+                                                            Alasan
+                                                        </p>
+
+                                                        <p
+                                                            class="tourhub-reason-content mt-2 text-sm leading-6 text-slate-700 {{ $needsToggle ? 'is-collapsible' : '' }}"
+                                                            data-recommendation-reason-content
+                                                            @if ($needsToggle) data-collapsible-reason="true" @endif
+                                                        >
+                                                            {{ $itemReason }}
+                                                        </p>
+
+                                                        @if ($needsToggle)
+                                                            <button
+                                                                type="button"
+                                                                class="tourhub-reason-button"
+                                                                data-recommendation-reason-button
+                                                                aria-expanded="false"
+                                                            >
+                                                                <span>⌄</span>
+                                                                Baca selengkapnya
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                @endif
 
                                                 @if (data_get($item, 'link_google_maps'))
                                                     <a
@@ -1620,6 +1750,48 @@
                 const sections = navLinks
                     .map((link) => document.querySelector(link.getAttribute('href')))
                     .filter(Boolean)
+
+                document.querySelectorAll('[data-recommendation-reason-button]').forEach((button) => {
+                    const reasonBox = button.closest('div')?.querySelector('[data-recommendation-reason-content]')
+
+                    if (!reasonBox) {
+                        return
+                    }
+
+                    const collapsedHeight = reasonBox.offsetHeight
+
+                    button.addEventListener('click', () => {
+                        const isExpanded = reasonBox.classList.contains('is-expanded')
+
+                        if (isExpanded) {
+                            reasonBox.style.maxHeight = `${reasonBox.scrollHeight}px`
+
+                            requestAnimationFrame(() => {
+                                reasonBox.classList.remove('is-expanded')
+                                reasonBox.style.maxHeight = `${collapsedHeight}px`
+                            })
+
+                            window.setTimeout(() => {
+                                reasonBox.style.maxHeight = ''
+                            }, 380)
+
+                            button.classList.remove('is-expanded')
+                            button.setAttribute('aria-expanded', 'false')
+                            button.innerHTML = '<span>⌄</span> Baca selengkapnya'
+                        } else {
+                            reasonBox.style.maxHeight = `${collapsedHeight}px`
+
+                            requestAnimationFrame(() => {
+                                reasonBox.classList.add('is-expanded')
+                                reasonBox.style.maxHeight = `${reasonBox.scrollHeight}px`
+                            })
+
+                            button.classList.add('is-expanded')
+                            button.setAttribute('aria-expanded', 'true')
+                            button.innerHTML = '<span>⌄</span> Tutup'
+                        }
+                    })
+                })
 
 
                 // Logic tambahan khusus navbar mobile halaman rekomendasi.
