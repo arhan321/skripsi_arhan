@@ -82,21 +82,32 @@
 <body class="min-h-screen bg-gradient-to-br from-slate-100 via-sky-50 to-white text-slate-900">
     <header class="tourhub-glass sticky top-0 z-50 border-b border-white/70 shadow-[0_10px_35px_rgba(15,23,42,0.07)]">
         <div class="mx-auto max-w-6xl px-4 sm:px-6">
-            <div class="flex min-h-16 items-center justify-between gap-3">
-                {{-- Brand --}}
+            <div class="flex min-h-[76px] items-center justify-between gap-3">
+                {{-- Brand: disamakan dengan logo pada halaman rekomendasi --}}
                 <a
                     href="{{ route('landing') }}"
                     class="group flex min-w-0 items-center gap-3 text-slate-950 transition duration-300 hover:text-blue-700"
                     aria-label="TourHub Bali"
                 >
-                    <span class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-950 text-xs font-black text-white shadow-lg shadow-slate-900/20 transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-blue-900/20">
-                        <span class="absolute inset-0 bg-gradient-to-br from-blue-500/35 via-transparent to-cyan-400/30"></span>
-                        <span class="relative">TH</span>
+                    <span class="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-blue-700 text-xl font-black text-white shadow-lg shadow-blue-900/20 transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-xl group-hover:shadow-blue-900/25">
+                        <span class="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.34),transparent_35%)]"></span>
+                        <span class="relative">T</span>
                     </span>
 
-                    <span class="min-w-0 leading-tight">
-                        <span class="block text-base font-black tracking-tight sm:text-lg">TourHub</span>
-                        <span class="block text-base font-black tracking-tight text-slate-800 sm:text-lg">Bali</span>
+                    <span class="min-w-0">
+                        <span class="flex items-center gap-2">
+                            <span class="truncate text-xl font-black leading-none tracking-tight text-slate-950 sm:text-2xl">
+                                TourHub
+                            </span>
+
+                            <span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-200">
+                                Bali
+                            </span>
+                        </span>
+
+                        <span class="mt-1 block truncate text-xs font-semibold text-slate-500">
+                            Temukan destinasi wisata terbaik
+                        </span>
                     </span>
                 </a>
 
