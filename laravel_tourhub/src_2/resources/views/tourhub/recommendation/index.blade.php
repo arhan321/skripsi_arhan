@@ -164,6 +164,93 @@
                 transform: translateY(-2px);
             }
 
+            /* =========================================================
+               Perbaikan tampilan card statistik rekomendasi - compact
+               Tujuan:
+               - card tidak terlalu besar seperti versi sebelumnya
+               - teks panjang seperti "Kondisi Kunjungan" dan
+                 "Sangat Mendukung" tetap aman, tidak offside/keluar card
+               - card utama di desktop kembali ringkas 4 kolom
+               - card daftar rekomendasi tetap nyaman 2 kolom
+            ========================================================= */
+            .tourhub-stat-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.7rem;
+            }
+
+            .tourhub-stat-grid--featured {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            @media (min-width: 1024px) {
+                .tourhub-stat-grid--featured {
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
+                }
+            }
+
+            .tourhub-stat-card {
+                display: flex;
+                min-width: 0;
+                min-height: 5.75rem;
+                flex-direction: column;
+                justify-content: center;
+                border-radius: 1rem;
+                background: rgb(255, 255, 255);
+                padding: 0.85rem;
+                box-shadow: inset 0 0 0 1px rgb(226, 232, 240);
+            }
+
+            .tourhub-stat-grid--featured .tourhub-stat-card {
+                min-height: 5.9rem;
+            }
+
+            .tourhub-stat-card--soft {
+                background: rgb(248, 250, 252);
+                box-shadow: inset 0 0 0 1px rgb(241, 245, 249);
+            }
+
+            .tourhub-stat-label {
+                font-size: 0.64rem;
+                font-weight: 800;
+                line-height: 0.95rem;
+                letter-spacing: 0.025em;
+                color: rgb(100, 116, 139);
+                text-transform: uppercase;
+                white-space: normal;
+                overflow-wrap: normal;
+                word-break: normal;
+            }
+
+            .tourhub-stat-value {
+                margin-top: 0.32rem;
+                color: rgb(2, 6, 23);
+                font-size: 1rem;
+                font-weight: 900;
+                line-height: 1.28rem;
+                white-space: normal;
+                overflow-wrap: normal;
+                word-break: normal;
+                hyphens: none;
+            }
+
+            .tourhub-stat-grid--featured .tourhub-stat-value {
+                font-size: 0.98rem;
+                line-height: 1.24rem;
+            }
+
+            @media (min-width: 1280px) {
+                .tourhub-stat-grid--featured .tourhub-stat-card {
+                    min-height: 6rem;
+                    padding: 0.95rem;
+                }
+
+                .tourhub-stat-grid--featured .tourhub-stat-value {
+                    font-size: 1rem;
+                    line-height: 1.28rem;
+                }
+            }
+
             .tourhub-reason-content {
                 display: block;
                 white-space: normal;
@@ -1054,7 +1141,7 @@
                                     </div>
 
                                     <div class="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-slate-200">
-                                        <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">
+                                        <p class="tourhub-stat-label">
                                             Pilihan Wisata
                                         </p>
                                         <p class="mt-1 text-3xl font-black text-slate-950">
@@ -1167,47 +1254,47 @@
                                                     @endif
                                                 </div>
 
-                                                <div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-                                                    <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                                                <div class="tourhub-stat-grid tourhub-stat-grid--featured mt-6">
+                                                    <div class="tourhub-stat-card">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Rating
                                                         </p>
-                                                        <p class="mt-1 text-xl font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ data_get($bestRecommendation, 'rating') }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                                                    <div class="tourhub-stat-card">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Ulasan
                                                         </p>
-                                                        <p class="mt-1 text-xl font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ number_format((int) data_get($bestRecommendation, 'jumlah_rating', 0)) }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                                                    <div class="tourhub-stat-card">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Kesesuaian
                                                         </p>
-                                                        <p class="mt-1 text-xl font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ $labelKesesuaian($bestRecommendation) }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                                                    <div class="tourhub-stat-card">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Kondisi Kunjungan
                                                         </p>
-                                                        <p class="mt-1 text-xl font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ $labelKondisi($bestRecommendation) }}
                                                         </p>
                                                     </div>
@@ -1333,47 +1420,47 @@
                                                     {{ data_get($item, 'kabupaten_kota') }}
                                                 </p>
 
-                                                <div class="mt-5 grid grid-cols-2 gap-3">
-                                                    <div class="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                                                <div class="tourhub-stat-grid mt-5">
+                                                    <div class="tourhub-stat-card tourhub-stat-card--soft">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Rating
                                                         </p>
-                                                        <p class="mt-1 text-lg font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ data_get($item, 'rating') }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                                                    <div class="tourhub-stat-card tourhub-stat-card--soft">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Ulasan
                                                         </p>
-                                                        <p class="mt-1 text-lg font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ number_format((int) data_get($item, 'jumlah_rating', 0)) }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                                                    <div class="tourhub-stat-card tourhub-stat-card--soft">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Kesesuaian
                                                         </p>
-                                                        <p class="mt-1 text-lg font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ $labelKesesuaian($item) }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                                                    <div class="tourhub-stat-card tourhub-stat-card--soft">
                                                         <p
-                                                            class="text-xs font-bold tracking-wide text-slate-500 uppercase"
+                                                            class="tourhub-stat-label"
                                                         >
                                                             Kondisi Kunjungan
                                                         </p>
-                                                        <p class="mt-1 text-lg font-black text-slate-950">
+                                                        <p class="tourhub-stat-value">
                                                             {{ $labelKondisi($item) }}
                                                         </p>
                                                     </div>
@@ -1535,7 +1622,7 @@
                                 <div class="h-32 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900"></div>
                                 <div class="p-5">
                                     <p class="text-xs font-black text-blue-700">Kategori</p>
-                                    <h3 class="mt-1 text-xl font-black text-slate-950">Alam Bali</h3>
+                                    <h3 class="tourhub-stat-value">Alam Bali</h3>
                                     <p class="mt-2 text-sm leading-6 text-slate-500">
                                         Cocok untuk pantai, air terjun, dan pegunungan.
                                     </p>
@@ -1546,7 +1633,7 @@
                                 <div class="h-32 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900"></div>
                                 <div class="p-5">
                                     <p class="text-xs font-black text-blue-700">Kategori</p>
-                                    <h3 class="mt-1 text-xl font-black text-slate-950">Budaya Bali</h3>
+                                    <h3 class="tourhub-stat-value">Budaya Bali</h3>
                                     <p class="mt-2 text-sm leading-6 text-slate-500">
                                         Cocok untuk pura, desa adat, dan wisata sejarah.
                                     </p>
@@ -1557,7 +1644,7 @@
                                 <div class="h-32 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900"></div>
                                 <div class="p-5">
                                     <p class="text-xs font-black text-blue-700">Kategori</p>
-                                    <h3 class="mt-1 text-xl font-black text-slate-950">Rekreasi</h3>
+                                    <h3 class="tourhub-stat-value">Rekreasi</h3>
                                     <p class="mt-2 text-sm leading-6 text-slate-500">
                                         Cocok untuk aktivitas keluarga dan tempat populer.
                                     </p>

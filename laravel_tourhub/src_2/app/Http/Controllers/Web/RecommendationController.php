@@ -38,11 +38,39 @@ final class RecommendationController extends Controller
      */
     private const DEFAULT_BALI_ADM4 = '51.04.05.1005';
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->ensureViewExists();
 
-        return view(self::VIEW_PATH, $this->baseViewData());
+        $viewData = $this->baseViewData();
+
+        /*
+         * PERBAIKAN REFRESH HALAMAN REKOMENDASI
+         *
+         * Jika halaman dibuka dengan parameter ?log=ID, maka halaman hanya
+         * membaca ulang hasil rekomendasi yang sudah tersimpan di database.
+         * Jadi ketika user menekan refresh browser, sistem tidak akan melakukan
+         * request ulang ke FastAPI/ML service.
+         */
+        $logId = $request->integer('log');
+
+        if ($logId > 0 && Auth::check()) {
+            $log = RecommendationLog::query()
+                ->where('user_id', Auth::id())
+                ->where('status', 'success')
+                ->find($logId);
+
+            if ($log) {
+                $viewData = array_merge($viewData, [
+                    'payload' => $log->request_payload,
+                    'result' => $log->response_payload,
+                    'responseTimeMs' => $log->response_time_ms,
+                    'activeLog' => $log,
+                ]);
+            }
+        }
+
+        return view(self::VIEW_PATH, $viewData);
     }
 
     public function health(TourHubMlService $ml): JsonResponse
@@ -111,17 +139,25 @@ final class RecommendationController extends Controller
 
             $responseTimeMs = $this->calculateResponseTime($startedAt);
 
-            $this->storeSuccessLog(
+            $log = $this->storeSuccessLog(
                 payload: $payload,
                 result: $result,
                 responseTimeMs: $responseTimeMs,
             );
 
-            return view(self::VIEW_PATH, array_merge($this->baseViewData(), [
-                'payload' => $payload,
-                'result' => $result,
-                'responseTimeMs' => $responseTimeMs,
-            ]));
+            /*
+             * PERBAIKAN UTAMA:
+             *
+             * Jangan langsung return view dari response POST.
+             * Gunakan pola POST -> REDIRECT -> GET.
+             *
+             * Dengan cara ini, ketika user refresh halaman hasil rekomendasi,
+             * browser hanya mengulang GET /tourhub/rekomendasi?log=ID,
+             * bukan mengulang POST yang memanggil FastAPI lagi.
+             */
+            return redirect()
+                ->route('tourhub.recommendation.index', ['log' => $log->id])
+                ->with('success', 'Rekomendasi berhasil dibuat.');
         } catch (Throwable $e) {
             $responseTimeMs = $this->calculateResponseTime($startedAt);
 
@@ -998,9 +1034,9 @@ final class RecommendationController extends Controller
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $result
      */
-    private function storeSuccessLog(array $payload, array $result, int $responseTimeMs): void
+    private function storeSuccessLog(array $payload, array $result, int $responseTimeMs): RecommendationLog
     {
-        RecommendationLog::query()->create([
+        return RecommendationLog::query()->create([
             'user_id' => Auth::id(),
             'weather_source' => data_get($result, 'weather_source'),
             'weather_used' => data_get($result, 'weather_used'),
