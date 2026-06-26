@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\User\ProfileController;
+use App\Http\Controllers\Web\WishlistController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\User\UserDashboardController;
 use App\Http\Controllers\Web\RecommendationController;
@@ -21,7 +22,6 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 | Jika ingin memakai fitur rekomendasi, user tetap diarahkan login terlebih dahulu.
 |
 */
-
 Route::get('/', function () {
     return view('landing');
 })->name('landing');
@@ -34,7 +34,6 @@ Route::get('/', function () {
 | Route untuk user yang belum login.
 |
 */
-
 Route::middleware('guest')->group(function (): void {
     /*
      * Alias login default Laravel.
@@ -76,7 +75,6 @@ Route::middleware('guest')->group(function (): void {
 | Route untuk user yang sudah login.
 |
 */
-
 Route::middleware('auth')->group(function (): void {
     Route::post('/user/logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('user.logout');
@@ -87,14 +85,23 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/user/recommendation-history/{recommendationLog}', [UserDashboardController::class, 'show'])
         ->name('user.recommendation-history.show');
 
+    Route::get('/user/wishlist', [WishlistController::class, 'index'])
+        ->name('user.wishlist.index');
+
+    Route::post('/wishlist/toggle', [WishlistController::class, 'toggle'])
+        ->name('wishlist.toggle');
+
+    Route::delete('/wishlist/{wishlist}', [WishlistController::class, 'destroy'])
+        ->name('wishlist.destroy');
+
     Route::get('/user/profile', [ProfileController::class, 'edit'])
-    ->name('user.profile.edit');
+        ->name('user.profile.edit');
 
-Route::put('/user/profile', [ProfileController::class, 'update'])
-    ->name('user.profile.update');
+    Route::put('/user/profile', [ProfileController::class, 'update'])
+        ->name('user.profile.update');
 
-Route::patch('/user/profile', [ProfileController::class, 'update'])
-    ->name('user.profile.patch');
+    Route::patch('/user/profile', [ProfileController::class, 'update'])
+        ->name('user.profile.patch');
 
     /*
     |--------------------------------------------------------------------------
@@ -105,7 +112,6 @@ Route::patch('/user/profile', [ProfileController::class, 'update'])
     | Diproteksi auth supaya hanya user login yang bisa menggunakan fitur rekomendasi.
     |
     */
-
     Route::prefix('tourhub')
         ->name('tourhub.')
         ->group(function (): void {
@@ -119,4 +125,3 @@ Route::patch('/user/profile', [ProfileController::class, 'update'])
                 ->name('ml.health');
         });
 });
-

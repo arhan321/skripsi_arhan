@@ -38,6 +38,18 @@
                         </a>
 
                         {{--
+                            Menu Wishlist User.
+                            Route ini harus tersedia:
+                            GET /user/wishlist -> name('user.wishlist.index')
+                        --}}
+                        <a
+                            href="{{ route('user.wishlist.index') }}"
+                            class="{{ request()->routeIs('user.wishlist.*') ? 'font-bold text-blue-700' : 'text-slate-600' }} transition hover:text-slate-950"
+                        >
+                            Wishlist
+                        </a>
+
+                        {{--
                             Menu Profile User.
                             Route ini harus tersedia:
                             GET /user/profile -> name('user.profile.edit')
@@ -88,6 +100,12 @@
             @if (session('status'))
                 <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-100 p-4 text-sm text-emerald-700">
                     {{ session('status') }}
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div class="mb-5 rounded-xl border border-red-200 bg-red-100 p-4 text-sm text-red-700">
+                    {{ session('error') }}
                 </div>
             @endif
 

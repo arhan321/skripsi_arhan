@@ -51,6 +51,14 @@ final class User extends Authenticatable
     }
 
     /**
+     * Relasi ke wishlist destinasi wisata.
+     */
+    public function wishlists(): HasMany
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
+    /**
      * Relasi khusus untuk log rekomendasi yang berhasil.
      */
     public function successfulRecommendationLogs(): HasMany
@@ -74,7 +82,7 @@ final class User extends Authenticatable
             return asset('storage/'.$this->avatar_url);
         }
 
-        $hash = md5(mb_strtolower(mb_trim($this->email)));
+        $hash = md5(mb_strtolower(trim($this->email)));
 
         return 'https://www.gravatar.com/avatar/'.$hash.'?d=mp&r=g&s=250';
     }

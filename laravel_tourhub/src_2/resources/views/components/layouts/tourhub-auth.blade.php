@@ -37,7 +37,7 @@
         }
 
         .tourhub-mobile-panel.is-open {
-            max-height: 520px;
+            max-height: 640px;
             opacity: 1;
             transform: translateY(0) scale(1);
             pointer-events: auto;
@@ -129,6 +129,20 @@
                         </a>
 
                         <a
+                            href="{{ route('user.dashboard') }}#riwayat"
+                            class="tourhub-nav-link text-slate-600 hover:bg-white hover:text-slate-950 hover:shadow-sm rounded-xl px-4 py-2 transition duration-300"
+                        >
+                            Riwayat
+                        </a>
+
+                        <a
+                            href="{{ route('user.wishlist.index') }}"
+                            class="tourhub-nav-link {{ request()->routeIs('user.wishlist.*') ? 'bg-slate-950 font-bold text-white shadow-md shadow-slate-900/15' : 'text-slate-600 hover:bg-white hover:text-slate-950 hover:shadow-sm' }} rounded-xl px-4 py-2 transition duration-300"
+                        >
+                            Wishlist
+                        </a>
+
+                        <a
                             href="{{ route('user.profile.edit') }}"
                             class="tourhub-nav-link {{ request()->routeIs('user.profile.*') ? 'bg-slate-950 font-bold text-white shadow-md shadow-slate-900/15' : 'text-slate-600 hover:bg-white hover:text-slate-950 hover:shadow-sm' }} rounded-xl px-4 py-2 transition duration-300"
                         >
@@ -200,6 +214,22 @@
                             </a>
 
                             <a
+                                href="{{ route('user.dashboard') }}#riwayat"
+                                class="group mt-1 flex items-center justify-between rounded-2xl px-4 py-3 text-slate-700 transition duration-300 hover:bg-slate-50 hover:text-slate-950"
+                            >
+                                <span>Riwayat</span>
+                                <span class="text-slate-300 transition duration-300 group-hover:translate-x-0.5 group-hover:text-blue-500">›</span>
+                            </a>
+
+                            <a
+                                href="{{ route('user.wishlist.index') }}"
+                                class="{{ request()->routeIs('user.wishlist.*') ? 'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-100' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950' }} group mt-1 flex items-center justify-between rounded-2xl px-4 py-3 transition duration-300"
+                            >
+                                <span>Wishlist</span>
+                                <span class="text-slate-300 transition duration-300 group-hover:translate-x-0.5 group-hover:text-blue-500">›</span>
+                            </a>
+
+                            <a
                                 href="{{ route('user.profile.edit') }}"
                                 class="{{ request()->routeIs('user.profile.*') ? 'bg-blue-50 font-bold text-blue-700 ring-1 ring-blue-100' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950' }} group mt-1 flex items-center justify-between rounded-2xl px-4 py-3 transition duration-300"
                             >
@@ -252,6 +282,12 @@
         @if (session('status'))
             <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700 shadow-sm">
                 {{ session('status') }}
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 shadow-sm">
+                {{ session('error') }}
             </div>
         @endif
 

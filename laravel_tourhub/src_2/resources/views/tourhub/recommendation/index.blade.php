@@ -480,6 +480,175 @@
                 $shouldShowReasonToggle = function (?string $reason): bool {
                     return mb_strlen(strip_tags((string) $reason)) > 135;
                 };
+
+
+                /*
+                 * =========================================================
+                 * Logic Wishlist langsung di view.
+                 * Catatan:
+                 * - Tidak memakai component tombol wishlist terpisah.
+                 * - Payload dibuat di sini dengan @php agar tidak double escape.
+                 * - destination_payload tetap JSON biasa supaya aman dengan controller lama/baru.
+                 * =========================================================
+                 */
+                $wishlistActiveLogId = isset($activeLog) && $activeLog
+                    ? $activeLog->id
+                    : (request()->integer('log') > 0 ? request()->integer('log') : null);
+
+                $wishlistTableAvailable = false;
+
+                try {
+                    $wishlistTableAvailable = class_exists(\App\Models\Wishlist::class)
+                        && \Illuminate\Support\Facades\Schema::hasTable('wishlists');
+                } catch (\Throwable $exception) {
+                    $wishlistTableAvailable = false;
+                }
+
+                $wishlistStringOrNull = function ($value): ?string {
+                    if ($value === null) {
+                        return null;
+                    }
+
+                    $value = trim((string) $value);
+
+                    return $value !== '' ? $value : null;
+                };
+
+                $wishlistNormalizeDestination = function ($destination) use ($wishlistStringOrNull): array {
+                    $snapshot = [
+                        'id' => data_get($destination, 'id'),
+                        'id_tempat' => data_get($destination, 'id_tempat'),
+                        'destination_id' => data_get($destination, 'destination_id'),
+
+                        'nama_tempat_wisata' => data_get($destination, 'nama_tempat_wisata')
+                            ?? data_get($destination, 'destination_name')
+                            ?? data_get($destination, 'name'),
+
+                        'destination_name' => data_get($destination, 'destination_name'),
+                        'name' => data_get($destination, 'name'),
+
+                        'kategori' => data_get($destination, 'kategori')
+                            ?? data_get($destination, 'category'),
+
+                        'category' => data_get($destination, 'category'),
+
+                        'tipe_wisata' => data_get($destination, 'tipe_wisata')
+                            ?? data_get($destination, 'tourism_type'),
+
+                        'tourism_type' => data_get($destination, 'tourism_type'),
+
+                        'kecamatan' => data_get($destination, 'kecamatan')
+                            ?? data_get($destination, 'subdistrict'),
+
+                        'subdistrict' => data_get($destination, 'subdistrict'),
+
+                        'kabupaten_kota' => data_get($destination, 'kabupaten_kota')
+                            ?? data_get($destination, 'city'),
+
+                        'city' => data_get($destination, 'city'),
+
+                        'rating' => data_get($destination, 'rating'),
+
+                        'jumlah_rating' => data_get($destination, 'jumlah_rating')
+                            ?? data_get($destination, 'review_count'),
+
+                        'review_count' => data_get($destination, 'review_count'),
+
+                        'latitude' => data_get($destination, 'latitude'),
+                        'longitude' => data_get($destination, 'longitude'),
+
+                        'link_google_maps' => data_get($destination, 'link_google_maps')
+                            ?? data_get($destination, 'google_maps_url')
+                            ?? data_get($destination, 'maps_url'),
+
+                        'google_maps_url' => data_get($destination, 'google_maps_url'),
+                        'maps_url' => data_get($destination, 'maps_url'),
+
+                        'link_gambar' => data_get($destination, 'link_gambar')
+                            ?? data_get($destination, 'image_url'),
+
+                        'image_url' => data_get($destination, 'image_url'),
+
+                        'alasan' => data_get($destination, 'alasan')
+                            ?? data_get($destination, 'reason'),
+
+                        'reason' => data_get($destination, 'reason'),
+
+                        'final_score' => data_get($destination, 'final_score'),
+                        'cbf_score' => data_get($destination, 'cbf_score'),
+                        'rating_score' => data_get($destination, 'rating_score'),
+                        'popularity_score' => data_get($destination, 'popularity_score'),
+                        'context_multiplier' => data_get($destination, 'context_multiplier'),
+                    ];
+
+                    return collect($snapshot)
+                        ->map(function ($value) use ($wishlistStringOrNull) {
+                            if (is_string($value)) {
+                                return $wishlistStringOrNull($value);
+                            }
+
+                            return $value;
+                        })
+                        ->filter(fn ($value) => $value !== null && $value !== '')
+                        ->all();
+                };
+
+                $wishlistDestinationKey = function ($destination) use ($wishlistNormalizeDestination, $wishlistStringOrNull): string {
+                    $snapshot = $wishlistNormalizeDestination($destination);
+
+                    $destinationId = $wishlistStringOrNull(
+                        data_get($snapshot, 'id_tempat')
+                            ?? data_get($snapshot, 'id')
+                            ?? data_get($snapshot, 'destination_id')
+                    );
+
+                    if ($destinationId) {
+                        return sha1('id:' . $destinationId);
+                    }
+
+                    $name = $wishlistStringOrNull(
+                        data_get($snapshot, 'nama_tempat_wisata')
+                            ?? data_get($snapshot, 'destination_name')
+                            ?? data_get($snapshot, 'name')
+                    );
+
+                    $latitude = $wishlistStringOrNull(data_get($snapshot, 'latitude'));
+                    $longitude = $wishlistStringOrNull(data_get($snapshot, 'longitude'));
+                    $subdistrict = $wishlistStringOrNull(data_get($snapshot, 'kecamatan'));
+                    $city = $wishlistStringOrNull(data_get($snapshot, 'kabupaten_kota'));
+
+                    return sha1(mb_strtolower(implode('|', [
+                        $name,
+                        $subdistrict,
+                        $city,
+                        $latitude,
+                        $longitude,
+                    ])));
+                };
+
+                $wishlistPayloadJson = function ($destination) use ($wishlistNormalizeDestination): string {
+                    $json = json_encode(
+                        $wishlistNormalizeDestination($destination),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+                    );
+
+                    return is_string($json) && $json !== '' ? $json : '{}';
+                };
+
+                $wishlistIsSaved = function ($destination) use ($wishlistDestinationKey, $wishlistTableAvailable): bool {
+                    if (! auth()->check() || ! $wishlistTableAvailable) {
+                        return false;
+                    }
+
+                    try {
+                        return \App\Models\Wishlist::query()
+                            ->where('user_id', auth()->id())
+                            ->where('destination_key', $wishlistDestinationKey($destination))
+                            ->exists();
+                    } catch (\Throwable $exception) {
+                        return false;
+                    }
+                };
             @endphp
 
             {{-- Jumlah Hasilavigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
@@ -547,6 +716,13 @@
                             </a>
 
                             <a
+                                href="{{ route('user.wishlist.index') }}"
+                                class="{{ request()->routeIs('user.wishlist.*') ? 'bg-amber-200 text-amber-800 ring-1 ring-amber-300' : 'bg-amber-100 text-amber-700 hover:bg-amber-200' }} tourhub-primary-action inline-flex items-center justify-center rounded-2xl px-4 py-2.5 shadow-sm shadow-amber-900/5 transition"
+                            >
+                                Wishlist
+                            </a>
+
+                            <a
                                 href="{{ route('user.dashboard') }}"
                                 class="tourhub-primary-action inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-white shadow-sm shadow-slate-900/15 transition hover:bg-slate-800"
                             >
@@ -606,6 +782,14 @@
                                 >
                                     <span>Riwayat Saya</span>
                                     <span class="text-blue-300 transition duration-300 group-hover:translate-x-0.5">›</span>
+                                </a>
+
+                                <a
+                                    href="{{ route('user.wishlist.index') }}"
+                                    class="{{ request()->routeIs('user.wishlist.*') ? 'bg-amber-100 font-black text-amber-800 ring-1 ring-amber-200' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 hover:bg-amber-100' }} group mt-1 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black transition duration-300"
+                                >
+                                    <span>Wishlist</span>
+                                    <span class="text-amber-300 transition duration-300 group-hover:translate-x-0.5">›</span>
                                 </a>
 
                                 <a
@@ -1089,6 +1273,24 @@
             </section>
 
             <main class="mx-auto max-w-7xl px-6 py-8">
+                @if (session('success'))
+                    <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-700 shadow-sm">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                @if (session('status'))
+                    <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-700 shadow-sm">
+                        {{ session('status') }}
+                    </div>
+                @endif
+
+                @if (session('error'))
+                    <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-700 shadow-sm">
+                        {{ session('error') }}
+                    </div>
+                @endif
+
                 {{-- Result Content --}}
                 <section id="hasil" class="section-anchor space-y-6">
                     @isset($result)
@@ -1243,15 +1445,41 @@
                                                         </h3>
                                                     </div>
 
-                                                    @if (data_get($bestRecommendation, 'link_google_maps'))
-                                                        <a
-                                                            href="{{ data_get($bestRecommendation, 'link_google_maps') }}"
-                                                            target="_blank"
-                                                            class="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700"
-                                                        >
-                                                            Buka Maps
-                                                        </a>
-                                                    @endif
+                                                    <div class="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+                                                        @php
+                                                            $bestWishlistSaved = $wishlistIsSaved($bestRecommendation);
+                                                            $bestWishlistPayload = $wishlistPayloadJson($bestRecommendation);
+                                                        @endphp
+
+                                                        <form method="POST" action="{{ route('wishlist.toggle') }}" class="shrink-0">
+                                                            @csrf
+
+                                                            @if ($wishlistActiveLogId)
+                                                                <input type="hidden" name="recommendation_log_id" value="{{ $wishlistActiveLogId }}">
+                                                            @endif
+
+                                                            <input type="hidden" name="destination_payload" value="{{ $bestWishlistPayload }}">
+
+                                                            <button
+                                                                type="submit"
+                                                                class="{{ $bestWishlistSaved ? 'bg-amber-400 text-slate-950 hover:bg-amber-500 shadow-amber-500/20' : 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:ring-amber-200' }} inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-black shadow-sm transition"
+                                                                title="{{ $bestWishlistSaved ? 'Hapus dari wishlist' : 'Tambahkan ke wishlist' }}"
+                                                            >
+                                                                <span>{{ $bestWishlistSaved ? '★' : '☆' }}</span>
+                                                                <span>{{ $bestWishlistSaved ? 'Tersimpan' : 'Wishlist' }}</span>
+                                                            </button>
+                                                        </form>
+
+                                                        @if (data_get($bestRecommendation, 'link_google_maps'))
+                                                            <a
+                                                                href="{{ data_get($bestRecommendation, 'link_google_maps') }}"
+                                                                target="_blank"
+                                                                class="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700"
+                                                            >
+                                                                Buka Maps
+                                                            </a>
+                                                        @endif
+                                                    </div>
                                                 </div>
 
                                                 <div class="tourhub-stat-grid tourhub-stat-grid--featured mt-6">
@@ -1501,15 +1729,41 @@
                                                     </div>
                                                 @endif
 
-                                                @if (data_get($item, 'link_google_maps'))
-                                                    <a
-                                                        href="{{ data_get($item, 'link_google_maps') }}"
-                                                        target="_blank"
-                                                        class="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-200"
-                                                    >
-                                                        Buka Maps
-                                                    </a>
-                                                @endif
+                                                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                                    @php
+                                                        $itemWishlistSaved = $wishlistIsSaved($item);
+                                                        $itemWishlistPayload = $wishlistPayloadJson($item);
+                                                    @endphp
+
+                                                    <form method="POST" action="{{ route('wishlist.toggle') }}" class="w-full sm:w-auto sm:flex-1">
+                                                        @csrf
+
+                                                        @if ($wishlistActiveLogId)
+                                                            <input type="hidden" name="recommendation_log_id" value="{{ $wishlistActiveLogId }}">
+                                                        @endif
+
+                                                        <input type="hidden" name="destination_payload" value="{{ $itemWishlistPayload }}">
+
+                                                        <button
+                                                            type="submit"
+                                                            class="{{ $itemWishlistSaved ? 'bg-amber-400 text-slate-950 hover:bg-amber-500 shadow-amber-500/20' : 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:ring-amber-200' }} inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black shadow-sm transition"
+                                                            title="{{ $itemWishlistSaved ? 'Hapus dari wishlist' : 'Tambahkan ke wishlist' }}"
+                                                        >
+                                                            <span>{{ $itemWishlistSaved ? '★' : '☆' }}</span>
+                                                            <span>{{ $itemWishlistSaved ? 'Tersimpan' : 'Wishlist' }}</span>
+                                                        </button>
+                                                    </form>
+
+                                                    @if (data_get($item, 'link_google_maps'))
+                                                        <a
+                                                            href="{{ data_get($item, 'link_google_maps') }}"
+                                                            target="_blank"
+                                                            class="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-200"
+                                                        >
+                                                            Buka Maps
+                                                        </a>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </article>
                                     @empty
