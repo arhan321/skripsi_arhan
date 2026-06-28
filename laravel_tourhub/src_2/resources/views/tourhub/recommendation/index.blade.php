@@ -1138,7 +1138,7 @@
                                                 <div class="flex items-start gap-3">
                                                     <span class="text-xl">🌤️</span>
                                                     <div>
-                                                        <p class="font-black text-slate-950">Otomatis dari Otomatis</p>
+                                                        <p class="font-black text-slate-950">Otomatis dari BMKG</p>
                                                         <p class="mt-1 text-xs font-medium leading-5 text-slate-500">
                                                             Cuaca akan dibaca otomatis. Jika cuaca kurang mendukung, TourHub akan mengutamakan tempat wisata yang lebih nyaman.
                                                         </p>

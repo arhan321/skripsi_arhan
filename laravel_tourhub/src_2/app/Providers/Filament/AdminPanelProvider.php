@@ -4,37 +4,38 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
-use App\Filament\Admin\Pages\Dashboard;
-use App\Filament\Admin\Resources\Users\UserResource;
-use App\Filament\Admin\Widgets\LatestAccessLogs;
+use Filament\Panel;
 use App\Models\User;
+use Filament\PanelProvider;
+use Filament\Enums\ThemeMode;
+use Filament\Support\Enums\Width;
 use Awcodes\Overlook\OverlookPlugin;
+use Filament\Support\Icons\Heroicon;
+use App\Filament\Admin\Pages\Dashboard;
+use Filament\Navigation\NavigationGroup;
+use Openplain\FilamentShadcnTheme\Color;
+use Filament\Http\Middleware\Authenticate;
+use Jeffgreco13\FilamentBreezy\BreezyCore;
 use Awcodes\Overlook\Widgets\OverlookWidget;
+use Filament\Support\Colors\Color as FilamentColor;
+use Illuminate\Session\Middleware\StartSession;
+use App\Filament\Admin\Widgets\LatestAccessLogs;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Filament\Http\Middleware\AuthenticateSession;
+use Jacobtims\FilamentLogger\FilamentLoggerPlugin;
+use App\Filament\Admin\Resources\Users\UserResource;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Caresome\FilamentAuthDesigner\AuthDesignerPlugin;
-use Caresome\FilamentAuthDesigner\Enums\MediaPosition;
-use CharrafiMed\GlobalSearchModal\GlobalSearchModalPlugin;
-use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
-use Filament\Enums\ThemeMode;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
-use Filament\Http\Middleware\DisableBladeIconComponents;
-use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Navigation\NavigationGroup;
-use Filament\Panel;
-use Filament\PanelProvider;
-use Filament\Support\Colors\Color as FilamentColor;
-use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Session\Middleware\StartSession;
+use Caresome\FilamentAuthDesigner\Enums\MediaPosition;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Jacobtims\FilamentLogger\FilamentLoggerPlugin;
-use Jeffgreco13\FilamentBreezy\BreezyCore;
-use Openplain\FilamentShadcnTheme\Color;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use CharrafiMed\GlobalSearchModal\GlobalSearchModalPlugin;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Caresome\FilamentAuthDesigner\View\AuthDesignerRenderHook;
+use DutchCodingCompany\FilamentDeveloperLogins\FilamentDeveloperLoginsPlugin;
 
 final class AdminPanelProvider extends PanelProvider
 {
@@ -59,12 +60,13 @@ final class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::adaptive(
                     lightColor: FilamentColor::Blue,
-                    darkColor: FilamentColor::Sky
+                    darkColor: FilamentColor::Sky,
                 ),
             ])
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\Filament\Admin\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
             ->pages([
+                //
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
@@ -75,6 +77,7 @@ final class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->collapsed(true)
                     ->label('General'),
+
                 NavigationGroup::make()
                     ->collapsed(true)
                     ->label('Administration'),
@@ -82,12 +85,17 @@ final class AdminPanelProvider extends PanelProvider
             ->plugins([
                 AuthDesignerPlugin::make()
                     ->login(fn ($config) => $config
-                        ->media('https://images.pexels.com/photos/466685/pexels-photo-466685.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2')
+                        ->media('https://images.unsplash.com/photo-1537953773345-d172ccf13cf1?auto=format&fit=crop&w=1800&q=85')
                         ->mediaPosition(MediaPosition::Left)
                         ->mediaSize('70%')
-                        ->blur(1)
+                        ->blur(0)
+                        ->renderHook(
+                            AuthDesignerRenderHook::MediaOverlay,
+                            fn () => view('filament.auth.tourhub-login-media'),
+                        )
                     )
                     ->themeToggle('90%', '50%'),
+
                 BreezyCore::make()
                     ->myProfile(
                         hasAvatars: true,
@@ -95,7 +103,9 @@ final class AdminPanelProvider extends PanelProvider
                         userMenuLabel: 'Profile',
                     )
                     ->enableBrowserSessions(),
+
                 GlobalSearchModalPlugin::make(),
+
                 OverlookPlugin::make()
                     ->sort(2)
                     ->columns([
@@ -107,6 +117,7 @@ final class AdminPanelProvider extends PanelProvider
                     ->includes([
                         UserResource::class,
                     ]),
+
                 FilamentShieldPlugin::make()
                     ->gridColumns([
                         'default' => 2,
@@ -122,9 +133,11 @@ final class AdminPanelProvider extends PanelProvider
                     ->navigationGroup('Administration')
                     ->navigationSort(2)
                     ->navigationIcon(Heroicon::ShieldCheck),
+
                 FilamentLoggerPlugin::make(),
+
                 FilamentDeveloperLoginsPlugin::make()
-                    ->enabled(app()->environment('local'))
+                    ->enabled(app()->environment('production') === true)
                     ->switchable(true)
                     ->users(fn () => User::pluck('email', 'name')->toArray()),
             ])

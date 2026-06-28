@@ -313,6 +313,72 @@
         word-break: normal;
     }
 
+    /*
+     * Rapihin khusus container "Pilihan Utama" pada detail history.
+     * Scope class ini hanya dipakai pada section pilihan utama agar bagian lain tidak ikut berubah.
+     */
+    .history-featured-main-card {
+        overflow: hidden;
+    }
+
+    .history-featured-content {
+        min-width: 0;
+    }
+
+    .history-featured-heading {
+        max-width: 28rem;
+        line-height: 1.15;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
+    .history-featured-actions {
+        display: flex;
+        width: 100%;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .history-featured-actions > * {
+        min-width: 0;
+    }
+
+    .history-featured-action-button {
+        white-space: nowrap;
+    }
+
+    .history-featured-stat-card {
+        min-width: 0;
+        min-height: 5.85rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .history-featured-stat-value {
+        overflow-wrap: anywhere;
+        word-break: normal;
+        line-height: 1.22;
+    }
+
+    @media (min-width: 1024px) {
+        .history-featured-heading {
+            max-width: none;
+        }
+    }
+
+    @media (max-width: 1279px) {
+        .history-featured-actions form,
+        .history-featured-actions a {
+            flex: 1 1 auto;
+        }
+
+        .history-featured-action-button {
+            width: 100%;
+        }
+    }
+
     .tourhub-card-reason-content {
         display: block;
         white-space: normal;
@@ -561,9 +627,9 @@
 
     @if ($recommendations->isNotEmpty())
         {{-- Pilihan Utama --}}
-        <section class="mt-6 overflow-hidden history-premium-shadow overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-blue-50">
+        <section class="history-featured-main-card mt-6 overflow-hidden history-premium-shadow rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-blue-50">
             <div class="grid grid-cols-1 lg:grid-cols-12">
-                <div class="relative min-h-[340px] lg:col-span-6">
+                <div class="relative min-h-[340px] lg:col-span-5">
                     @if (data_get($bestRecommendation, 'link_gambar'))
                         <img
                             src="{{ data_get($bestRecommendation, 'link_gambar') }}"
@@ -598,99 +664,101 @@
                     </div>
                 </div>
 
-                <div class="p-6 md:p-8 lg:col-span-6">
-                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <div class="flex flex-wrap gap-2">
-                                <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
-                                    Pilihan Utama
-                                </span>
+                <div class="history-featured-content p-6 md:p-8 lg:col-span-7">
+                    <div class="flex flex-col gap-5">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
+                                        Pilihan Utama
+                                    </span>
 
-                                <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
-                                    {{ data_get($bestRecommendation, 'kategori') ?? '-' }}
-                                </span>
+                                    <span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                                        {{ data_get($bestRecommendation, 'kategori') ?? '-' }}
+                                    </span>
 
-                                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                    {{ ucfirst((string) data_get($bestRecommendation, 'tipe_wisata', '-')) }}
-                                </span>
+                                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                        {{ ucfirst((string) data_get($bestRecommendation, 'tipe_wisata', '-')) }}
+                                    </span>
+                                </div>
+
+                                <h2 class="history-featured-heading mt-4 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+                                    Kenapa destinasi ini cocok?
+                                </h2>
                             </div>
 
-                            <h2 class="mt-4 text-2xl font-black tracking-tight text-slate-950">
-                                Kenapa destinasi ini cocok?
-                            </h2>
-                        </div>
+                            @php
+                                $bestIsWishlisted = $isDestinationWishlisted($bestRecommendation);
+                                $bestWishlistPayload = $makeWishlistPayload($bestRecommendation);
+                            @endphp
 
-                        @php
-                            $bestIsWishlisted = $isDestinationWishlisted($bestRecommendation);
-                            $bestWishlistPayload = $makeWishlistPayload($bestRecommendation);
-                        @endphp
+                            <div class="history-featured-actions xl:w-auto xl:justify-end">
+                                @if ($wishlistToggleUrl)
+                                    <form method="POST" action="{{ $wishlistToggleUrl }}">
+                                        @csrf
 
-                        <div class="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
-                            @if ($wishlistToggleUrl)
-                                <form method="POST" action="{{ $wishlistToggleUrl }}">
-                                    @csrf
+                                        <input type="hidden" name="recommendation_log_id" value="{{ $log->id }}">
+                                        <input type="hidden" name="destination_payload_encoding" value="base64">
+                                        <input type="hidden" name="destination_payload" value="{{ $bestWishlistPayload }}">
 
-                                    <input type="hidden" name="recommendation_log_id" value="{{ $log->id }}">
-                                    <input type="hidden" name="destination_payload_encoding" value="base64">
-                                    <input type="hidden" name="destination_payload" value="{{ $bestWishlistPayload }}">
+                                        <button
+                                            type="submit"
+                                            class="{{ $bestIsWishlisted ? 'bg-amber-400 text-slate-950 hover:bg-amber-500' : 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:ring-amber-200' }} history-featured-action-button inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm transition"
+                                        >
+                                            <span>{{ $bestIsWishlisted ? '★' : '☆' }}</span>
+                                            <span>{{ $bestIsWishlisted ? 'Tersimpan' : 'Wishlist' }}</span>
+                                        </button>
+                                    </form>
+                                @endif
 
-                                    <button
-                                        type="submit"
-                                        class="{{ $bestIsWishlisted ? 'bg-amber-400 text-slate-950 hover:bg-amber-500' : 'bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:ring-amber-200' }} inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm transition"
+                                @if ($wishlistIndexUrl)
+                                    <a
+                                        href="{{ $wishlistIndexUrl }}"
+                                        class="history-featured-action-button inline-flex shrink-0 items-center justify-center rounded-2xl bg-amber-100 px-4 py-2.5 text-sm font-black text-amber-700 transition hover:bg-amber-200"
                                     >
-                                        <span>{{ $bestIsWishlisted ? '★' : '☆' }}</span>
-                                        <span>{{ $bestIsWishlisted ? 'Tersimpan' : 'Wishlist' }}</span>
-                                    </button>
-                                </form>
-                            @endif
+                                        Lihat Wishlist
+                                    </a>
+                                @endif
 
-                            @if ($wishlistIndexUrl)
-                                <a
-                                    href="{{ $wishlistIndexUrl }}"
-                                    class="inline-flex shrink-0 items-center justify-center rounded-2xl bg-amber-100 px-4 py-2.5 text-sm font-black text-amber-700 transition hover:bg-amber-200"
-                                >
-                                    Lihat Wishlist
-                                </a>
-                            @endif
-
-                            @if (data_get($bestRecommendation, 'link_google_maps'))
-                                <a
-                                    href="{{ data_get($bestRecommendation, 'link_google_maps') }}"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700"
-                                >
-                                    📍 Buka Maps
-                                </a>
-                            @endif
+                                @if (data_get($bestRecommendation, 'link_google_maps'))
+                                    <a
+                                        href="{{ data_get($bestRecommendation, 'link_google_maps') }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="history-featured-action-button inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700"
+                                    >
+                                        📍 Buka Maps
+                                    </a>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
-                    <div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <div class="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+                        <div class="history-featured-stat-card rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                             <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Rating</p>
-                            <p class="mt-1 text-xl font-black text-slate-950">
+                            <p class="history-featured-stat-value mt-1 text-xl font-black text-slate-950">
                                 {{ data_get($bestRecommendation, 'rating') }}
                             </p>
                         </div>
 
-                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="history-featured-stat-card rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                             <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Ulasan</p>
-                            <p class="mt-1 text-xl font-black text-slate-950">
+                            <p class="history-featured-stat-value mt-1 text-xl font-black text-slate-950">
                                 {{ number_format((int) data_get($bestRecommendation, 'jumlah_rating', 0)) }}
                             </p>
                         </div>
 
-                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="history-featured-stat-card rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                             <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Kesesuaian</p>
-                            <p class="mt-1 text-base font-black text-slate-950">
+                            <p class="history-featured-stat-value mt-1 text-sm font-black text-slate-950 md:text-base">
                                 {{ $matchLabel($bestRecommendation) }}
                             </p>
                         </div>
 
-                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <div class="history-featured-stat-card rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                             <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Kondisi</p>
-                            <p class="mt-1 text-base font-black text-slate-950">
+                            <p class="history-featured-stat-value mt-1 text-sm font-black text-slate-950 md:text-base">
                                 {{ $conditionLabel($bestRecommendation) }}
                             </p>
                         </div>
