@@ -19,7 +19,8 @@ app = FastAPI(title=APP_TITLE, description=APP_DESCRIPTION, version="0.1.0")
 
 @lru_cache(maxsize=1)
 def get_recommender() -> TourHubRecommender:
-    data_path = Path(os.getenv("DATA_PATH", "data/bali_tourist_destination.csv"))
+    # data_path = Path(os.getenv("DATA_PATH", "data/bali_tourist_destination.csv"))
+    data_path = Path(os.getenv("DATA_PATH", "data/cleaned_dataaset_bali.csv"))
     return TourHubRecommender(RecommenderConfig(data_path=data_path))
 
 

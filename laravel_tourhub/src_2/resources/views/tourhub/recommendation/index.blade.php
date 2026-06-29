@@ -384,7 +384,7 @@
                  * Otomatis data terbuka prakiraan cuaca tersedia dalam format 3 harian,
                  * dengan 8 data per hari atau interval sekitar 3 jam.
                  */
-                $bmkgForecastPeriodText = 'Info cuaca beberapa hari ke depan';
+                $bmkgForecastPeriodText = 'Info cuaca 3 hari kedepan';
                 $bmkgForecastIntervalText = 'Cuaca diperbarui berkala';
 
 
