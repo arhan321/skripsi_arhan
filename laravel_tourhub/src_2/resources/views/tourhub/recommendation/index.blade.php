@@ -1847,7 +1847,7 @@
                                         <div class="grid grid-cols-2 gap-3">
                                             <div class="rounded-2xl bg-white/10 p-4 backdrop-blur">
                                                 <p class="text-xs text-slate-300">Kesesuaian</p>
-                                                <p class="mt-1 font-black">Kesesuaian</p>
+                                                <p class="mt-1 font-black">Wisata</p>
                                             </div>
 
                                             <div class="rounded-2xl bg-white/10 p-4 backdrop-blur">
