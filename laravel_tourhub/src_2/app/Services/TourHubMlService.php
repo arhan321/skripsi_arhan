@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\ConnectionException;
 
 final class TourHubMlService
 {
     public function __construct(
         private ?string $baseUrl = null,
         private ?int $timeout = null,
+        private ?string $apiKey = null,
     ) {
-        $this->baseUrl = mb_rtrim($baseUrl ?: config('tourhub.ml_base_url'), '/');
+        $this->baseUrl = rtrim($baseUrl ?: (string) config('tourhub.ml_base_url'), '/');
         $this->timeout = $timeout ?: (int) config('tourhub.ml_timeout', 30);
+        $this->apiKey = $apiKey ?: (string) config('tourhub.ml_api_key', '123');
     }
 
     public function health(): array
@@ -42,10 +44,16 @@ final class TourHubMlService
     private function request(string $method, string $endpoint, array $data = []): array
     {
         try {
-            $client = Http::timeout($this->timeout)->acceptJson()->asJson();
+            $client = Http::timeout($this->timeout)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'X-API-Key' => $this->apiKey,
+                ]);
+
             $url = $this->baseUrl.$endpoint;
 
-            $response = match (mb_strtolower($method)) {
+            $response = match (strtolower($method)) {
                 'get' => $client->get($url, $data),
                 'post' => $client->post($url, $data),
                 default => throw new RuntimeException("Unsupported HTTP method: {$method}"),
