@@ -8,6 +8,13 @@ services:
       - ./app:/app/app
       - ./data:/app/data
     environment:
-      DATA_PATH: /app/data/bali_tourist_destination.csv
+      API_SECRET_KEY: "123"
+      DATA_SOURCE: "laravel"
+      DATA_PATH: "/app/data/cleaned_dataaset_bali.csv"
+
+      LARAVEL_DATASET_URL: "https://prediksi.djncloud.my.id/api/internal/tourist-destinations"
+      LARAVEL_INTERNAL_KEY: "123"
+
+      DATASET_REQUEST_TIMEOUT: "30"
       ENABLE_BMKG: "true"
     restart: unless-stopped

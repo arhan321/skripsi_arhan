@@ -1,21 +1,25 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
-use RuntimeException;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
-final class TourHubMlService
+class TourHubMlService
 {
-    public function __construct(
-        private ?string $baseUrl = null,
-        private ?int $timeout = null,
-        private ?string $apiKey = null,
-    ) {
+    private string $baseUrl;
+
+    private int $timeout;
+
+    private string $apiKey;
+
+    public function __construct(?string $baseUrl = null, ?int $timeout = null, ?string $apiKey = null)
+    {
         $this->baseUrl = rtrim($baseUrl ?: (string) config('tourhub.ml_base_url'), '/');
         $this->timeout = $timeout ?: (int) config('tourhub.ml_timeout', 30);
         $this->apiKey = $apiKey ?: (string) config('tourhub.ml_api_key', '123');
@@ -41,17 +45,37 @@ final class TourHubMlService
         return $this->request('post', '/recommend', $payload);
     }
 
+    public function reloadDataset(): array
+    {
+        return $this->request('post', '/reload-dataset');
+    }
+
+    public function reloadDatasetSilently(): void
+    {
+        try {
+            $this->reloadDataset();
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    private function client(): PendingRequest
+    {
+        return Http::timeout($this->timeout)
+            ->connectTimeout(5)
+            ->retry(2, 300)
+            ->acceptJson()
+            ->asJson()
+            ->withHeaders([
+                'X-API-Key' => $this->apiKey,
+            ]);
+    }
+
     private function request(string $method, string $endpoint, array $data = []): array
     {
         try {
-            $client = Http::timeout($this->timeout)
-                ->acceptJson()
-                ->asJson()
-                ->withHeaders([
-                    'X-API-Key' => $this->apiKey,
-                ]);
-
             $url = $this->baseUrl.$endpoint;
+            $client = $this->client();
 
             $response = match (strtolower($method)) {
                 'get' => $client->get($url, $data),
@@ -60,7 +84,8 @@ final class TourHubMlService
             };
 
             if ($response->failed()) {
-                throw new RuntimeException("ML API error HTTP {$response->status()}: ".$response->body());
+                $body = Str::limit($response->body(), 500);
+                throw new RuntimeException("ML API error HTTP {$response->status()}: {$body}");
             }
 
             return $response->json() ?? [];

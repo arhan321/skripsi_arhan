@@ -129,6 +129,79 @@
         return mb_strlen(strip_tags((string) $reason)) > 135;
     };
 
+
+    $formatTourismType = function ($type): string {
+        $type = strtolower(trim((string) $type));
+
+        return match ($type) {
+            'outdoor' => 'Luar ruangan',
+            'indoor' => 'Dalam ruangan',
+            'mixed' => 'Fleksibel',
+            default => $type !== '' && $type !== '-' ? ucfirst($type) : '-',
+        };
+    };
+
+    $buildFriendlyReason = function ($item, int $index = 0) use ($matchLabel, $conditionLabel, $formatTourismType): string {
+        $name = trim((string) (
+            data_get($item, 'nama_tempat_wisata')
+            ?? data_get($item, 'destination_name')
+            ?? data_get($item, 'name')
+            ?? 'Destinasi ini'
+        ));
+
+        $category = trim((string) (data_get($item, 'kategori') ?? data_get($item, 'category') ?? ''));
+        $type = $formatTourismType(data_get($item, 'tipe_wisata') ?? data_get($item, 'tourism_type') ?? '');
+        $subdistrict = trim((string) (data_get($item, 'kecamatan') ?? data_get($item, 'subdistrict') ?? ''));
+        $city = trim((string) (data_get($item, 'kabupaten_kota') ?? data_get($item, 'city') ?? ''));
+        $rating = data_get($item, 'rating');
+        $reviewCount = (int) (data_get($item, 'jumlah_rating') ?? data_get($item, 'review_count') ?? 0);
+        $match = strtolower($matchLabel($item));
+        $condition = strtolower($conditionLabel($item));
+
+        $locationParts = array_filter([$subdistrict, $city], fn ($value) => $value !== '' && $value !== '-');
+        $locationText = count($locationParts) ? implode(', ', $locationParts) : 'wilayah yang kamu pilih';
+
+        $sentences = [];
+
+        if ($index === 0) {
+            $sentences[] = $name . ' menjadi pilihan utama karena paling mendekati preferensi dan rencana kunjunganmu.';
+        } else {
+            $sentences[] = $name . ' direkomendasikan karena cukup dekat dengan preferensi dan rencana kunjunganmu.';
+        }
+
+        $profileParts = [];
+
+        if ($category !== '' && $category !== '-') {
+            $profileParts[] = 'kategori ' . $category;
+        }
+
+        if ($type !== '-') {
+            $profileParts[] = 'tipe kunjungan ' . strtolower($type);
+        }
+
+        if (count($profileParts)) {
+            $sentences[] = 'Destinasi ini termasuk ' . implode(' dengan ', $profileParts) . ' di ' . $locationText . '.';
+        } else {
+            $sentences[] = 'Destinasi ini berada di ' . $locationText . ' dan masuk dalam daftar pilihan yang relevan untuk pencarianmu.';
+        }
+
+        if ($rating !== null && $rating !== '') {
+            $ratingText = 'Penilaian pengunjungnya baik, dengan rating ' . $rating;
+
+            if ($reviewCount > 0) {
+                $ratingText .= ' dari ' . number_format($reviewCount) . ' ulasan';
+            }
+
+            $sentences[] = $ratingText . '.';
+        } elseif ($reviewCount > 0) {
+            $sentences[] = 'Destinasi ini memiliki ' . number_format($reviewCount) . ' ulasan dari pengunjung.';
+        }
+
+        $sentences[] = 'Tingkat kesesuaiannya ' . $match . ', dengan kondisi kunjungan yang ' . $condition . '.';
+
+        return implode(' ', array_filter($sentences));
+    };
+
     /*
      |--------------------------------------------------------------------------
      | Logic Wishlist langsung di halaman detail history
@@ -678,7 +751,7 @@
                                     </span>
 
                                     <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                        {{ ucfirst((string) data_get($bestRecommendation, 'tipe_wisata', '-')) }}
+                                        {{ $formatTourismType(data_get($bestRecommendation, 'tipe_wisata', '-')) }}
                                     </span>
                                 </div>
 
@@ -774,7 +847,7 @@
                         </p>
 
                         @php
-                            $bestReason = $cleanReason(data_get($bestRecommendation, 'alasan'));
+                            $bestReason = $buildFriendlyReason($bestRecommendation, 0);
                         @endphp
 
                         @if ($bestReason)
@@ -851,7 +924,7 @@
                                 </span>
 
                                 <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                                    {{ ucfirst((string) data_get($item, 'tipe_wisata', '-')) }}
+                                    {{ $formatTourismType(data_get($item, 'tipe_wisata', '-')) }}
                                 </span>
                             </div>
 
@@ -890,7 +963,7 @@
                             </div>
 
                             @php
-                                $itemReason = $cleanReason(data_get($item, 'alasan'));
+                                $itemReason = $buildFriendlyReason($item, $index);
                                 $needsToggle = $shouldShowReasonToggle($itemReason);
                             @endphp
 

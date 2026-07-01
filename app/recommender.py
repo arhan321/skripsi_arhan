@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +7,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import requests
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -26,11 +26,12 @@ def _normalize_text(value: object) -> str:
 
 
 def infer_tipe_wisata(row: pd.Series) -> str:
-    """Inferensi sederhana indoor/outdoor/mixed dari kategori dan nama destinasi.
+    """Inferensi sederhana indoor/outdoor/mixed dari kategori dan nama destinasi."""
 
-    Ini rule-based agar CARS bisa menyesuaikan rekomendasi berdasarkan cuaca.
-    Untuk skripsi, rule ini sebaiknya dijelaskan sebagai contextual post-filtering.
-    """
+    existing = _normalize_text(row.get("tipe_wisata", ""))
+    if existing in {"indoor", "outdoor", "mixed"}:
+        return existing
+
     name = _normalize_text(row.get("nama_tempat_wisata", ""))
     kategori = _normalize_text(row.get("kategori", ""))
 
@@ -88,10 +89,11 @@ def infer_tipe_wisata(row: pd.Series) -> str:
 
 def weather_group(weather: Optional[str]) -> str:
     """Kelompokkan deskripsi cuaca ke cerah/hujan/berawan/tidak_diketahui."""
+
     if not weather:
         return "tidak_diketahui"
-    text = _normalize_text(weather)
 
+    text = _normalize_text(weather)
     rainy_terms = ["hujan", "rain", "shower", "storm", "petir", "thunder", "lebat", "gerimis"]
     clear_terms = ["cerah", "clear", "sunny"]
     cloudy_terms = ["berawan", "cloud", "mendung", "overcast", "kabut", "fog"]
@@ -106,20 +108,8 @@ def weather_group(weather: Optional[str]) -> str:
 
 
 def is_rainy_weather(weather: Optional[str]) -> bool:
-    """Return True jika cuaca masuk kelompok hujan.
+    """Return True jika cuaca masuk kelompok hujan."""
 
-    Fungsi ini dipakai untuk strict weather filtering.
-    Contoh input yang dianggap hujan:
-    - hujan
-    - hujan ringan
-    - hujan sedang
-    - hujan lebat
-    - gerimis
-    - rain / shower / storm
-
-    Dengan rule ini, saat cuaca hujan, destinasi bertipe outdoor
-    bisa dikeluarkan dari kandidat rekomendasi.
-    """
     return weather_group(weather) == "hujan"
 
 
@@ -130,10 +120,8 @@ def compute_context_multiplier(
     visit_day: Optional[str] = None,
     is_high_season: bool = False,
 ) -> Tuple[float, List[str]]:
-    """Hitung pengali konteks untuk CARS.
+    """Hitung pengali konteks untuk CARS."""
 
-    Nilai >1 menaikkan rekomendasi, nilai <1 menurunkan rekomendasi.
-    """
     multiplier = 1.0
     reasons: List[str] = []
     w_group = weather_group(weather)
@@ -184,6 +172,10 @@ def compute_context_multiplier(
 @dataclass
 class RecommenderConfig:
     data_path: Path
+    data_source: str = "csv"  # csv atau laravel
+    laravel_dataset_url: Optional[str] = None
+    laravel_internal_key: Optional[str] = None
+    request_timeout: int = 30
     min_df: int = 1
     ngram_range: Tuple[int, int] = (1, 2)
 
@@ -193,16 +185,50 @@ class TourHubRecommender:
 
     def __init__(self, config: RecommenderConfig):
         self.config = config
-        self.df = self._load_and_clean_data(config.data_path)
+        self.df = self._load_and_clean_data(config)
         self.vectorizer = TfidfVectorizer(min_df=config.min_df, ngram_range=config.ngram_range)
         self.destination_matrix = self.vectorizer.fit_transform(self.df["feature_text"])
 
     @staticmethod
-    def _load_and_clean_data(data_path: Path) -> pd.DataFrame:
-        if not data_path.exists():
-            raise FileNotFoundError(f"Dataset tidak ditemukan: {data_path}")
+    def _load_raw_data(config: RecommenderConfig) -> pd.DataFrame:
+        source = (config.data_source or "csv").lower().strip()
 
-        df = pd.read_csv(data_path)
+        if source == "laravel":
+            if not config.laravel_dataset_url:
+                raise ValueError("DATA_SOURCE=laravel tetapi LARAVEL_DATASET_URL belum diisi.")
+
+            headers = {"Accept": "application/json"}
+            if config.laravel_internal_key:
+                headers["X-TourHub-Internal-Key"] = config.laravel_internal_key
+
+            response = requests.get(
+                config.laravel_dataset_url,
+                headers=headers,
+                params={"active": "1", "limit": "10000"},
+                timeout=config.request_timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+
+            if isinstance(payload, dict):
+                rows = payload.get("data", [])
+            else:
+                rows = payload
+
+            if not isinstance(rows, list):
+                raise ValueError("Format dataset dari Laravel tidak valid. Field data harus berupa list.")
+
+            return pd.DataFrame(rows)
+
+        if not config.data_path.exists():
+            raise FileNotFoundError(f"Dataset tidak ditemukan: {config.data_path}")
+
+        return pd.read_csv(config.data_path)
+
+    @staticmethod
+    def _load_and_clean_data(config: RecommenderConfig) -> pd.DataFrame:
+        df = TourHubRecommender._load_raw_data(config)
+
         required_columns = [
             "id_tempat",
             "nama_tempat_wisata",
@@ -219,8 +245,12 @@ class TourHubRecommender:
             raise ValueError(f"Kolom wajib tidak ada di dataset: {missing}")
 
         df = df.copy()
+
         for col in ["id_tempat", "nama_tempat_wisata", "kategori", "kecamatan", "kabupaten_kota"]:
             df[col] = df[col].fillna("").astype(str).str.strip()
+
+        if "is_active" in df.columns:
+            df = df[df["is_active"].fillna(True).astype(bool)]
 
         df["rating"] = pd.to_numeric(df["rating"], errors="coerce").fillna(0.0)
         df["jumlah_rating"] = pd.to_numeric(df["jumlah_rating"], errors="coerce").fillna(0).astype(int)
@@ -230,10 +260,22 @@ class TourHubRecommender:
         df = df.drop_duplicates(subset=["nama_tempat_wisata", "latitude", "longitude"], keep="first")
         df = df.dropna(subset=["latitude", "longitude"])
 
+        if "tipe_wisata" not in df.columns:
+            df["tipe_wisata"] = ""
         df["tipe_wisata"] = df.apply(infer_tipe_wisata, axis=1)
 
-        # Normalisasi skor rating dan popularitas.
-        max_rating = df["rating"].max() if df["rating"].max() else 5
+        optional_cols = ["link_google_maps", "link_gambar", "deskripsi"]
+        for col in optional_cols:
+            if col not in df.columns:
+                df[col] = None
+
+        for col in optional_cols:
+            df[col] = df[col].where(df[col].notna(), None)
+
+        if df.empty:
+            raise ValueError("Dataset kosong setelah proses cleaning.")
+
+        max_rating = float(df["rating"].max()) if float(df["rating"].max()) > 0 else 5.0
         df["rating_score"] = (df["rating"] / max_rating).clip(0, 1)
 
         log_reviews = np.log1p(df["jumlah_rating"].astype(float))
@@ -250,17 +292,15 @@ class TourHubRecommender:
             + df["kabupaten_kota"].map(_normalize_text)
             + " "
             + df["tipe_wisata"].map(_normalize_text)
+            + " "
+            + df["deskripsi"].map(_normalize_text)
         )
-
-        optional_cols = ["link_google_maps", "link_gambar"]
-        for col in optional_cols:
-            if col not in df.columns:
-                df[col] = None
 
         return df.reset_index(drop=True)
 
     def metadata(self) -> Dict[str, object]:
         return {
+            "data_source": self.config.data_source,
             "total_destinations": int(len(self.df)),
             "categories": sorted(self.df["kategori"].dropna().unique().tolist()),
             "kabupaten_kota": sorted(self.df["kabupaten_kota"].dropna().unique().tolist()),
@@ -274,10 +314,12 @@ class TourHubRecommender:
         kabupaten_kota: Optional[str] = None,
     ) -> List[Dict[str, object]]:
         data = self.df.copy()
+
         if kategori:
             data = data[data["kategori"].str.lower() == kategori.lower()]
         if kabupaten_kota:
             data = data[data["kabupaten_kota"].str.lower() == kabupaten_kota.lower()]
+
         columns = [
             "id_tempat",
             "nama_tempat_wisata",
@@ -291,8 +333,15 @@ class TourHubRecommender:
             "longitude",
             "link_google_maps",
             "link_gambar",
+            "deskripsi",
         ]
-        return data.sort_values(["rating", "jumlah_rating"], ascending=False)[columns].head(limit).to_dict(orient="records")
+
+        return (
+            data.sort_values(["rating", "jumlah_rating"], ascending=False)[columns]
+            .head(limit)
+            .replace({np.nan: None})
+            .to_dict(orient="records")
+        )
 
     @staticmethod
     def _build_user_query(
@@ -308,7 +357,22 @@ class TourHubRecommender:
         if kecamatan:
             parts.append(_normalize_text(kecamatan))
         parts.extend([_normalize_text(x) for x in keywords if x])
+
         return " ".join([p for p in parts if p]) or "wisata bali"
+
+    @staticmethod
+    def _build_reason(row: pd.Series) -> str:
+        reasons = [
+            f"Destinasi memiliki kesesuaian preferensi dengan skor CBF {float(row['cbf_score']):.3f}",
+            f"rating {float(row['rating']):.2f}",
+            f"jumlah rating {int(row['jumlah_rating'])}",
+        ]
+
+        context_reasons = row.get("context_reasons", [])
+        if isinstance(context_reasons, list) and context_reasons:
+            reasons.extend(context_reasons)
+
+        return "; ".join(reasons) + "."
 
     def recommend(
         self,
@@ -325,19 +389,14 @@ class TourHubRecommender:
     ) -> Tuple[pd.DataFrame, Dict[str, object]]:
         kategori_preferensi = kategori_preferensi or []
         keywords = keywords or []
-        user_query = self._build_user_query(kategori_preferensi, kabupaten_kota, kecamatan, keywords)
 
+        user_query = self._build_user_query(kategori_preferensi, kabupaten_kota, kecamatan, keywords)
         user_vector = self.vectorizer.transform([user_query])
         cbf_scores = cosine_similarity(user_vector, self.destination_matrix).flatten()
 
         result = self.df.copy()
         result["cbf_score"] = cbf_scores
 
-        # Filter lembut untuk lokasi/rating.
-        # Catatan:
-        # - Kategori sengaja tidak difilter keras agar sistem tetap eksploratif.
-        # - Cuaca hujan memakai strict weather filter: destinasi outdoor dikeluarkan
-        #   dari kandidat agar hasil lebih sesuai dengan kondisi kunjungan.
         if kabupaten_kota:
             result = result[result["kabupaten_kota"].str.lower() == kabupaten_kota.lower()]
         if kecamatan:
@@ -346,22 +405,13 @@ class TourHubRecommender:
             result = result[result["rating"] >= float(min_rating)]
 
         total_after_basic_filter = int(len(result))
-
         strict_weather_filter_applied = False
         strict_weather_filter_removed_outdoor = 0
         strict_weather_filter_reason: Optional[str] = None
 
         if strict_weather_filter and is_rainy_weather(weather):
             before_weather_filter = int(len(result))
-
-            result = result[
-                result["tipe_wisata"]
-                .fillna("")
-                .astype(str)
-                .str.lower()
-                .ne("outdoor")
-            ].copy()
-
+            result = result[result["tipe_wisata"].fillna("").astype(str).str.lower().ne("outdoor")].copy()
             after_weather_filter = int(len(result))
             strict_weather_filter_applied = True
             strict_weather_filter_removed_outdoor = before_weather_filter - after_weather_filter
@@ -372,7 +422,6 @@ class TourHubRecommender:
 
         if result.empty:
             message = "Tidak ada kandidat setelah filter."
-
             if strict_weather_filter_applied:
                 message = (
                     "Tidak ada kandidat non-outdoor setelah strict weather filter. "
@@ -402,16 +451,16 @@ class TourHubRecommender:
             ),
             axis=1,
         )
+
         result["context_multiplier"] = [x[0] for x in context_values]
         result["context_reasons"] = [x[1] for x in context_values]
 
-        # CBF = kesamaan preferensi; rating & popularitas = kualitas umum destinasi.
         result["base_score"] = (
-            0.70 * result["cbf_score"] + 0.20 * result["rating_score"] + 0.10 * result["popularity_score"]
+            (0.70 * result["cbf_score"])
+            + (0.20 * result["rating_score"])
+            + (0.10 * result["popularity_score"])
         )
         result["final_score"] = result["base_score"] * result["context_multiplier"]
-
-        total_after_filter = int(len(result))
 
         result = result.sort_values("final_score", ascending=False).head(top_n).copy()
         result["alasan"] = result.apply(self._build_reason, axis=1)
@@ -429,6 +478,7 @@ class TourHubRecommender:
             "longitude",
             "link_google_maps",
             "link_gambar",
+            "deskripsi",
             "cbf_score",
             "rating_score",
             "popularity_score",
@@ -436,26 +486,15 @@ class TourHubRecommender:
             "final_score",
             "alasan",
         ]
-        meta = {
+
+        return result[output_columns].replace({np.nan: None}), {
             "user_query": user_query,
             "weather_group": weather_group(weather),
             "total_after_basic_filter": total_after_basic_filter,
-            "total_after_filter": total_after_filter,
+            "total_after_filter": int(len(result)),
             "total_returned": int(len(result)),
             "strict_weather_filter": bool(strict_weather_filter),
             "strict_weather_filter_applied": strict_weather_filter_applied,
             "strict_weather_filter_removed_outdoor": strict_weather_filter_removed_outdoor,
             "strict_weather_filter_reason": strict_weather_filter_reason,
         }
-        return result[output_columns], meta
-
-    @staticmethod
-    def _build_reason(row: pd.Series) -> str:
-        reasons = [
-            f"cocok dengan fitur/preferensi user (CBF={row['cbf_score']:.3f})",
-            f"rating {row['rating']:.1f} dengan {int(row['jumlah_rating'])} ulasan",
-        ]
-        context_reasons = row.get("context_reasons", [])
-        if isinstance(context_reasons, list) and context_reasons:
-            reasons.extend(context_reasons[:2])
-        return "; ".join(reasons)

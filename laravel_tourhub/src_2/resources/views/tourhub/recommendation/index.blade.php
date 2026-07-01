@@ -447,6 +447,68 @@
                     return 'Perlu Dipertimbangkan';
                 };
 
+                $labelTipeWisata = function ($tipe): string {
+                    $tipe = strtolower(trim((string) $tipe));
+
+                    return match ($tipe) {
+                        'outdoor' => 'Luar ruangan',
+                        'indoor' => 'Dalam ruangan',
+                        'mixed' => 'Fleksibel',
+                        default => $tipe !== '' ? ucfirst($tipe) : '-',
+                    };
+                };
+
+                $labelHariKunjungan = function ($hari): string {
+                    $hari = strtolower(trim((string) $hari));
+
+                    return match ($hari) {
+                        'weekday' => 'Hari biasa',
+                        'weekend' => 'Akhir pekan',
+                        default => $hari !== '' ? ucfirst($hari) : '-',
+                    };
+                };
+
+                $friendlyReason = function ($item, int $index = 0) use ($labelKesesuaian, $labelKondisi, $labelTipeWisata): string {
+                    $nama = trim((string) data_get($item, 'nama_tempat_wisata', 'Destinasi ini'));
+                    $kategori = trim((string) data_get($item, 'kategori', 'wisata'));
+                    $tipe = $labelTipeWisata(data_get($item, 'tipe_wisata'));
+                    $kecamatan = trim((string) data_get($item, 'kecamatan', ''));
+                    $kabupaten = trim((string) data_get($item, 'kabupaten_kota', ''));
+                    $rating = (float) data_get($item, 'rating', 0);
+                    $jumlahUlasan = (int) data_get($item, 'jumlah_rating', 0);
+                    $kesesuaian = $labelKesesuaian($item);
+                    $kondisi = $labelKondisi($item);
+
+                    $lokasiParts = array_values(array_filter([$kecamatan, $kabupaten]));
+                    $lokasi = count($lokasiParts) > 0 ? implode(', ', $lokasiParts) : 'area yang kamu pilih';
+
+                    $parts = [];
+
+                    if ($index === 0) {
+                        $parts[] = $nama . ' menjadi pilihan utama karena paling mendekati preferensi dan rencana kunjunganmu.';
+                    } else {
+                        $parts[] = $nama . ' cocok dipertimbangkan karena sesuai dengan preferensi dan rencana kunjunganmu.';
+                    }
+
+                    $parts[] = 'Destinasi ini termasuk kategori ' . $kategori . ' dengan tipe kunjungan ' . strtolower($tipe) . ' di ' . $lokasi . '.';
+
+                    if ($rating > 0 && $jumlahUlasan > 0) {
+                        if ($rating >= 4.5) {
+                            $parts[] = 'Penilaian pengunjungnya sangat baik, dengan rating ' . number_format($rating, 1) . ' dari ' . number_format($jumlahUlasan) . ' ulasan.';
+                        } elseif ($rating >= 4.0) {
+                            $parts[] = 'Penilaian pengunjungnya baik, dengan rating ' . number_format($rating, 1) . ' dari ' . number_format($jumlahUlasan) . ' ulasan.';
+                        } else {
+                            $parts[] = 'Tempat ini tetap bisa dipertimbangkan berdasarkan pilihan lokasi, kategori, dan kondisi kunjunganmu.';
+                        }
+                    } elseif ($rating > 0) {
+                        $parts[] = 'Tempat ini memiliki rating ' . number_format($rating, 1) . ' dan tetap relevan dengan pilihanmu.';
+                    }
+
+                    $parts[] = 'Tingkat kesesuaiannya: ' . strtolower($kesesuaian) . ', dengan kondisi kunjungan yang ' . strtolower($kondisi) . '.';
+
+                    return implode(' ', $parts);
+                };
+
                 $cleanReason = function ($reason): string {
                     $reason = trim((string) $reason);
 
@@ -457,6 +519,11 @@
                     // Bersihkan angka dan istilah teknis agar alasan nyaman dibaca user biasa.
                     $reason = preg_replace('/\s*\(\s*CBF\s*=\s*[^\)]*\)/i', '', $reason);
                     $reason = preg_replace('/\s*CBF\s*=\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*skor\s*CBF\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*score\s*CBF\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*cbf_score\s*[:=]?\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*final_score\s*[:=]?\s*[0-9\.]+\s*;?/i', '', $reason);
+                    $reason = preg_replace('/\s*context_multiplier\s*[:=]?\s*[0-9\.]+\s*;?/i', '', $reason);
                     $reason = preg_replace('/\s*context\s*=\s*[0-9\.]+\s*;?/i', '', $reason);
                     $reason = preg_replace('/\s*final score\s*[^;\.]*[;\.]?/i', '', $reason);
 
@@ -1164,7 +1231,7 @@
                                             >
                                                 @foreach (['weekday', 'weekend'] as $day)
                                                     <option value="{{ $day }}" @selected($selectedVisitDay === $day)>
-                                                        {{ ucfirst($day) }}
+                                                        {{ $labelHariKunjungan($day) }}
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -1337,7 +1404,7 @@
                                         @if (strtolower((string) data_get($result, 'weather_used')) === 'hujan')
                                             <div class="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
                                                 🌧️ Otomatis mendeteksi potensi hujan pada wilayah ini. Sistem otomatis
-                                                memprioritaskan destinasi indoor atau mixed agar perjalanan lebih nyaman.
+                                                memprioritaskan destinasi dalam ruangan atau tempat yang fleksibel agar perjalanan lebih nyaman.
                                             </div>
                                         @endif
                                     </div>
@@ -1434,7 +1501,7 @@
                                                             <span
                                                                 class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600"
                                                             >
-                                                                {{ data_get($bestRecommendation, 'tipe_wisata') ?? '-' }}
+                                                                {{ $labelTipeWisata(data_get($bestRecommendation, 'tipe_wisata')) }}
                                                             </span>
                                                         </div>
 
@@ -1536,14 +1603,12 @@
                                                     </p>
 
                                                     <p class="mt-2 text-sm leading-6 text-slate-700">
-                                                        Destinasi ini memiliki
-                                                        <strong>paling sesuai</strong>
-                                                        dibanding pilihan lainnya. Nilai ini dihitung dari kesesuaian preferensi,
-                                                        rating, jumlah ulasan, dan kondisi kunjungan.
+                                                        Destinasi ini menjadi pilihan utama karena paling mendekati
+                                                        preferensi, lokasi, dan kondisi kunjungan yang kamu pilih.
                                                     </p>
 
                                                     @php
-                                                        $bestReason = $cleanReason(data_get($bestRecommendation, 'alasan'));
+                                                        $bestReason = $friendlyReason($bestRecommendation, 0);
                                                     @endphp
 
                                                     @if ($bestReason)
@@ -1633,7 +1698,7 @@
                                                     <span
                                                         class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600"
                                                     >
-                                                        {{ data_get($item, 'tipe_wisata') ?? '-' }}
+                                                        {{ $labelTipeWisata(data_get($item, 'tipe_wisata')) }}
                                                     </span>
                                                 </div>
 
@@ -1695,7 +1760,7 @@
                                                 </div>
 
                                                 @php
-                                                    $itemReason = $cleanReason(data_get($item, 'alasan'));
+                                                    $itemReason = $friendlyReason($item, $index);
                                                     $needsToggle = $shouldShowReasonToggle($itemReason);
                                                 @endphp
 

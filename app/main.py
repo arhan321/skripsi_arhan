@@ -12,22 +12,10 @@ from app.bmkg import fetch_bmkg_weather
 from app.recommender import RecommenderConfig, TourHubRecommender
 from app.schemas import RecommendRequest, RecommendResponse
 
-
-APP_TITLE = "TourHub Bali ML API"
+APP_TITLE = "TourHub Bali FAST API"
 APP_DESCRIPTION = "FastAPI untuk rekomendasi destinasi wisata Bali menggunakan CBF + CARS."
 
-# Secret key sederhana untuk Swagger Authorize.
-# Cara pakai:
-# 1. Buka /docs
-# 2. Klik tombol Authorize
-# 3. Masukkan secret key
-# 4. Klik Authorize
-# 5. Baru endpoint bisa di-try out dengan sukses
-API_SECRET_KEY = "123"
-
-# Nama header API key yang akan muncul di Swagger.
-# Swagger akan mengirim header:
-# X-API-Key: <secret-key>
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "123")
 API_KEY_HEADER_NAME = "X-API-Key"
 
 api_key_header = APIKeyHeader(
@@ -38,15 +26,8 @@ api_key_header = APIKeyHeader(
 
 
 def verify_api_key(api_key: Optional[str] = Security(api_key_header)) -> str:
-    """
-    Mengecek secret key dari tombol Authorize Swagger atau dari header request.
+    """Mengecek secret key dari tombol Authorize Swagger atau dari header request."""
 
-    Header:
-    X-API-Key: <secret-key>
-
-    Jika belum klik Authorize atau key salah, semua endpoint akan mengembalikan 401.
-    Pesan error sengaja tidak menampilkan isi secret key.
-    """
     if api_key != API_SECRET_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -59,22 +40,28 @@ def verify_api_key(api_key: Optional[str] = Security(api_key_header)) -> str:
 app = FastAPI(
     title=APP_TITLE,
     description=APP_DESCRIPTION,
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url=None,
     openapi_url="/openapi.json",
-
-    # Semua endpoint API dikunci dengan API key.
-    # Halaman Swagger tetap bisa dibuka, tetapi Try Out endpoint akan 401
-    # kalau belum klik Authorize dan memasukkan secret key.
     dependencies=[Depends(verify_api_key)],
 )
 
 
 @lru_cache(maxsize=1)
 def get_recommender() -> TourHubRecommender:
+    data_source = os.getenv("DATA_SOURCE", "csv").strip().lower()
     data_path = Path(os.getenv("DATA_PATH", "data/bali_tourist_destination.csv"))
-    return TourHubRecommender(RecommenderConfig(data_path=data_path))
+
+    config = RecommenderConfig(
+        data_path=data_path,
+        data_source=data_source,
+        laravel_dataset_url=os.getenv("LARAVEL_DATASET_URL"),
+        laravel_internal_key=os.getenv("LARAVEL_INTERNAL_KEY"),
+        request_timeout=int(os.getenv("DATASET_REQUEST_TIMEOUT", "30")),
+    )
+
+    return TourHubRecommender(config)
 
 
 @app.get("/")
@@ -102,6 +89,24 @@ def metadata() -> dict:
     return get_recommender().metadata()
 
 
+@app.post("/reload-dataset")
+def reload_dataset() -> dict:
+    """Clear cache dan baca ulang dataset.
+
+    Endpoint ini dipanggil Laravel setelah admin menambah, mengubah, atau
+    menghapus data destinasi wisata dari Filament.
+    """
+
+    get_recommender.cache_clear()
+    recommender = get_recommender()
+
+    return {
+        "status": "reloaded",
+        "message": "Dataset rekomendasi berhasil dibaca ulang.",
+        "metadata": recommender.metadata(),
+    }
+
+
 @app.get("/destinations")
 def destinations(
     limit: int = Query(default=20, ge=1, le=100),
@@ -121,20 +126,10 @@ def destinations(
 
 
 def _resolve_weather_context(payload: RecommendRequest) -> tuple[str, str, Dict[str, Any]]:
-    """
-    Tentukan cuaca yang dipakai CARS.
+    """Tentukan cuaca yang dipakai CARS."""
 
-    Prioritas:
-    1. Jika use_bmkg=True dan bmkg_adm4 tersedia, ambil cuaca dari BMKG.
-    2. Jika BMKG gagal/kosong/ADM4 tidak tersedia, fallback ke `cerah`.
-
-    Catatan penting:
-    Sistem ini tidak melakukan prediksi cuaca sendiri.
-    Sistem hanya menggunakan prakiraan BMKG sebagai konteks untuk CARS.
-    """
     weather_used = payload.weather or "cerah"
-    weather_source = "default_cerah"
-
+    weather_source = "manual" if payload.weather else "default_cerah"
     bmkg_context: Dict[str, Any] = {
         "rain_detected": False,
         "fallback_weather": "cerah",
@@ -153,7 +148,6 @@ def _resolve_weather_context(payload: RecommendRequest) -> tuple[str, str, Dict[
 
         try:
             bmkg_result = fetch_bmkg_weather(payload.bmkg_adm4)
-
             weather_used = (
                 bmkg_result.get("weather_group")
                 or bmkg_result.get("weather_desc")
@@ -161,7 +155,6 @@ def _resolve_weather_context(payload: RecommendRequest) -> tuple[str, str, Dict[
                 or "cerah"
             )
             weather_source = f"BMKG adm4={payload.bmkg_adm4}"
-
             bmkg_context = {
                 "rain_detected": bool(bmkg_result.get("rain_detected", False)),
                 "rain_slots_count": bmkg_result.get("rain_slots_count", 0),
@@ -174,13 +167,12 @@ def _resolve_weather_context(payload: RecommendRequest) -> tuple[str, str, Dict[
                 "wind_speed": bmkg_result.get("wind_speed"),
                 "local_datetime": bmkg_result.get("local_datetime"),
             }
-        except Exception as exc:  # noqa: BLE001 - fallback sengaja agar rekomendasi tetap berjalan
+        except Exception:  # noqa: BLE001 - fallback sengaja agar rekomendasi tetap berjalan
             weather_used = "cerah"
-            weather_source = f"default_cerah_bmkg_error: {exc}"
+            weather_source = "default_cerah_bmkg_error"
             bmkg_context = {
                 **bmkg_context,
                 "message": "Gagal mengambil data BMKG, sistem memakai fallback cerah.",
-                "error": str(exc),
             }
 
     return str(weather_used), weather_source, bmkg_context
@@ -204,10 +196,6 @@ def recommend(payload: RecommendRequest) -> RecommendResponse:
         strict_weather_filter=True,
     )
 
-    # Jika cuaca hujan dan strict weather filter menghasilkan 0 kandidat,
-    # sistem tidak dibuat blank.
-    # Rekomendasi ditampilkan ulang tanpa filter keras,
-    # tetapi penalti CARS untuk outdoor tetap berlaku.
     if result.empty and meta.get("strict_weather_filter_applied"):
         result, fallback_meta = recommender.recommend(
             kategori_preferensi=payload.kategori_preferensi,
@@ -221,11 +209,9 @@ def recommend(payload: RecommendRequest) -> RecommendResponse:
             is_high_season=payload.is_high_season,
             strict_weather_filter=False,
         )
-
         fallback_meta["fallback_reason"] = (
             "Strict weather filter menghasilkan 0 kandidat. "
-            "Sistem menampilkan rekomendasi alternatif dengan penalti CARS "
-            "untuk destinasi outdoor."
+            "Sistem menampilkan rekomendasi alternatif dengan penalti CARS untuk destinasi outdoor."
         )
         fallback_meta["strict_weather_filter_fallback_used"] = True
         meta = fallback_meta

@@ -1,4 +1,5 @@
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -73,6 +74,7 @@ class DestinationResponse(BaseModel):
     longitude: float
     link_google_maps: Optional[str] = None
     link_gambar: Optional[str] = None
+    deskripsi: Optional[str] = None
     cbf_score: float
     rating_score: float
     popularity_score: float
