@@ -78,6 +78,7 @@
         $responseAvg = (float) $safe('avg_response');
         $responseHealth = $responseAvg <= 800 ? 'Sangat Cepat' : ($responseAvg <= 2000 ? 'Stabil' : ($responseAvg <= 5000 ? 'Perlu Optimasi' : 'Lambat'));
         $responseHealthClass = $responseAvg <= 800 ? 'rl-chip-green' : ($responseAvg <= 2000 ? 'rl-chip-cyan' : ($responseAvg <= 5000 ? 'rl-chip-yellow' : 'rl-chip-red'));
+        $responseGauge = $responseAvg <= 0 ? 8 : max(8, min(100, 100 - (($responseAvg / 5000) * 100)));
         $corePulse = max(8, min(100, $successRate));
         $failurePulse = max(0, min(100, $failedRate));
         $bmkgPulse = max(0, min(100, $bmkgRate));
@@ -1688,66 +1689,224 @@
         .rl-mega-stat-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 0.8rem;
+            gap: 0.82rem;
+            align-items: stretch;
         }
 
-        @media (min-width: 760px) {
+        @media (min-width: 720px) {
             .rl-mega-stat-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
-        @media (min-width: 1300px) {
+        @media (min-width: 1280px) {
             .rl-mega-stat-grid {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
         .rl-mega-stat {
+            --rl-card-accent: #22d3ee;
             position: relative;
             overflow: hidden;
-            min-height: 9.4rem;
-            padding: 1rem;
-            border-radius: 1.2rem;
-            border: 1px solid rgba(255,255,255,.11);
+            min-height: 8.2rem;
+            padding: 0.95rem;
+            border-radius: 1.25rem;
+            border: 1px solid rgba(255,255,255,.13);
             background:
-                radial-gradient(circle at top right, rgba(255,255,255,.12), transparent 26%),
-                linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.045));
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+                linear-gradient(145deg, rgba(255,255,255,.105), rgba(255,255,255,.052)),
+                radial-gradient(circle at top left, color-mix(in srgb, var(--rl-card-accent) 28%, transparent), transparent 34%),
+                radial-gradient(circle at bottom right, rgba(255,255,255,.085), transparent 34%);
+            box-shadow:
+                0 18px 46px rgba(2, 6, 23, .20),
+                inset 0 1px 0 rgba(255,255,255,.11);
+            transition: transform 190ms ease, border-color 190ms ease, background 190ms ease, box-shadow 190ms ease;
+        }
+
+        .rl-mega-stat:hover {
+            transform: translateY(-3px);
+            border-color: color-mix(in srgb, var(--rl-card-accent) 48%, rgba(255,255,255,.14));
+            box-shadow:
+                0 24px 62px rgba(2, 6, 23, .28),
+                0 0 0 1px color-mix(in srgb, var(--rl-card-accent) 18%, transparent),
+                inset 0 1px 0 rgba(255,255,255,.14);
+        }
+
+        .rl-mega-stat::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 0.2rem;
+            background: linear-gradient(90deg, transparent, var(--rl-card-accent), transparent);
+            opacity: 0.9;
         }
 
         .rl-mega-stat::after {
             content: attr(data-watermark);
             position: absolute;
-            right: -0.2rem;
-            bottom: -1rem;
-            color: rgba(255,255,255,.045);
-            font-size: 4rem;
+            right: -0.28rem;
+            bottom: -0.72rem;
+            color: rgba(255,255,255,.038);
+            font-size: 3.55rem;
             line-height: 1;
             font-weight: 1000;
             letter-spacing: -0.08em;
             pointer-events: none;
+            transform: skewX(-8deg);
+        }
+
+        .rl-mega-stat-head {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 2.55rem minmax(0, 1fr) auto;
+            gap: 0.72rem;
+            align-items: start;
+        }
+
+        .rl-mega-icon {
+            width: 2.55rem;
+            height: 2.55rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            color: white;
+            background:
+                radial-gradient(circle at top left, rgba(255,255,255,.28), transparent 45%),
+                color-mix(in srgb, var(--rl-card-accent) 68%, #020617);
+            border: 1px solid rgba(255,255,255,.14);
+            box-shadow:
+                0 12px 28px color-mix(in srgb, var(--rl-card-accent) 22%, transparent),
+                inset 0 1px 0 rgba(255,255,255,.16);
+            font-size: 1.02rem;
+            flex: 0 0 auto;
+        }
+
+        .rl-mega-topline {
+            color: #dbeafe;
+            font-size: 0.62rem;
+            line-height: 1rem;
+            font-weight: 1000;
+            letter-spacing: 0.105em;
+            text-transform: uppercase;
         }
 
         .rl-mega-value {
             position: relative;
             z-index: 2;
-            margin-top: 0.45rem;
+            margin-top: 0.12rem;
             color: white;
-            font-size: 2.15rem;
-            line-height: 1;
+            font-size: clamp(1.55rem, 2.1vw, 2.25rem);
+            line-height: 0.96;
             font-weight: 1000;
             letter-spacing: -0.06em;
+            word-break: break-word;
+        }
+
+        .rl-mega-status-chip {
+            min-width: max-content;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 0.32rem 0.54rem;
+            color: white;
+            background: color-mix(in srgb, var(--rl-card-accent) 18%, rgba(255,255,255,.08));
+            border: 1px solid color-mix(in srgb, var(--rl-card-accent) 35%, rgba(255,255,255,.12));
+            font-size: 0.62rem;
+            line-height: 1;
+            font-weight: 1000;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
 
         .rl-mega-desc {
             position: relative;
             z-index: 2;
-            margin: 0.52rem 0 0;
+            margin: 0.72rem 0 0;
             color: #bfdbfe;
-            font-size: 0.75rem;
-            line-height: 1.42;
-            font-weight: 780;
+            font-size: 0.73rem;
+            line-height: 1.48;
+            font-weight: 760;
+        }
+
+        .rl-mega-microbar {
+            position: relative;
+            z-index: 2;
+            height: 0.46rem;
+            margin-top: 0.82rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, .58);
+            border: 1px solid rgba(255,255,255,.08);
+        }
+
+        .rl-mega-microbar span {
+            display: block;
+            height: 100%;
+            width: var(--rl-bar-width, 45%);
+            min-width: 0.25rem;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--rl-card-accent), #ffffff);
+            box-shadow: 0 0 18px color-mix(in srgb, var(--rl-card-accent) 50%, transparent);
+        }
+
+        .rl-mega-foot {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.45rem;
+            margin-top: 0.75rem;
+        }
+
+        .rl-mega-foot-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.32rem;
+            border-radius: 999px;
+            padding: 0.3rem 0.55rem;
+            color: #e2e8f0;
+            background: rgba(255,255,255,.075);
+            border: 1px solid rgba(255,255,255,.095);
+            font-size: 0.64rem;
+            line-height: 1;
+            font-weight: 900;
+        }
+
+        .rl-success-glow {
+            --rl-card-accent: #34d399;
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.14), 0 18px 56px rgba(16, 185, 129, 0.08), inset 0 1px 0 rgba(255,255,255,.1);
+        }
+
+        .rl-danger-glow {
+            --rl-card-accent: #fb7185;
+            box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.14), 0 18px 56px rgba(244, 63, 94, 0.08), inset 0 1px 0 rgba(255,255,255,.1);
+        }
+
+        .rl-blue-glow {
+            --rl-card-accent: #60a5fa;
+            box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.14), 0 18px 56px rgba(37, 99, 235, 0.1), inset 0 1px 0 rgba(255,255,255,.1);
+        }
+
+        .rl-cyan-glow {
+            --rl-card-accent: #22d3ee;
+            box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.14), 0 18px 56px rgba(6, 182, 212, 0.1), inset 0 1px 0 rgba(255,255,255,.1);
+        }
+
+        @media (max-width: 760px) {
+            .rl-mega-stat-head {
+                grid-template-columns: 2.45rem minmax(0, 1fr);
+            }
+
+            .rl-mega-status-chip {
+                grid-column: 1 / -1;
+                width: fit-content;
+            }
         }
 
         .rl-floating-action-dock {
@@ -1780,18 +1939,6 @@
             transform: translateY(-2px);
             border-color: rgba(34,211,238,.35);
             background: rgba(34,211,238,.1);
-        }
-
-        .rl-danger-glow {
-            box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.14), 0 18px 56px rgba(244, 63, 94, 0.08);
-        }
-
-        .rl-success-glow {
-            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.14), 0 18px 56px rgba(16, 185, 129, 0.08);
-        }
-
-        .rl-blue-glow {
-            box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.14), 0 18px 56px rgba(37, 99, 235, 0.1);
         }
 
         @media (max-width: 700px) {
@@ -1995,24 +2142,71 @@
                             <div>
                                 <div class="rl-mega-stat-grid">
                                     <div class="rl-mega-stat rl-success-glow" data-watermark="OK">
-                                        <div class="rl-small-label">Success Signal</div>
-                                        <div class="rl-mega-value">{{ $formatNumber($safe('success')) }}</div>
-                                        <p class="rl-mega-desc">request berhasil diproses oleh pipeline rekomendasi.</p>
+                                        <div class="rl-mega-stat-head">
+                                            <div class="rl-mega-icon">✓</div>
+                                            <div>
+                                                <div class="rl-mega-topline">Success Signal</div>
+                                                <div class="rl-mega-value">{{ $formatNumber($safe('success')) }}</div>
+                                            </div>
+                                            <span class="rl-mega-status-chip">Stable</span>
+                                        </div>
+                                        <p class="rl-mega-desc">Request berhasil diproses oleh pipeline rekomendasi Laravel → FastAPI.</p>
+                                        <div class="rl-mega-microbar" style="--rl-bar-width: {{ $successRate }}%;"><span></span></div>
+                                        <div class="rl-mega-foot">
+                                            <span class="rl-mega-foot-pill">{{ $formatPercent($successRate) }}</span>
+                                            <span class="rl-mega-foot-pill">healthy traffic</span>
+                                        </div>
                                     </div>
+
                                     <div class="rl-mega-stat {{ $safe('failed') > 0 ? 'rl-danger-glow' : 'rl-success-glow' }}" data-watermark="ERR">
-                                        <div class="rl-small-label">Failure Signal</div>
-                                        <div class="rl-mega-value">{{ $formatNumber($safe('failed')) }}</div>
-                                        <p class="rl-mega-desc">request gagal yang perlu dilihat detailnya oleh admin.</p>
+                                        <div class="rl-mega-stat-head">
+                                            <div class="rl-mega-icon">!</div>
+                                            <div>
+                                                <div class="rl-mega-topline">Failure Signal</div>
+                                                <div class="rl-mega-value">{{ $formatNumber($safe('failed')) }}</div>
+                                            </div>
+                                            <span class="rl-mega-status-chip">{{ $safe('failed') > 0 ? 'Review' : 'Clean' }}</span>
+                                        </div>
+                                        <p class="rl-mega-desc">Request gagal yang perlu dilihat detailnya oleh admin melalui halaman view log.</p>
+                                        <div class="rl-mega-microbar" style="--rl-bar-width: {{ max(4, $failedRate) }}%;"><span></span></div>
+                                        <div class="rl-mega-foot">
+                                            <span class="rl-mega-foot-pill">{{ $formatPercent($failedRate) }}</span>
+                                            <span class="rl-mega-foot-pill">error monitor</span>
+                                        </div>
                                     </div>
-                                    <div class="rl-mega-stat rl-blue-glow" data-watermark="BMKG">
-                                        <div class="rl-small-label">Weather Intelligence</div>
-                                        <div class="rl-mega-value">{{ $formatPercent($bmkgRate) }}</div>
-                                        <p class="rl-mega-desc">persentase rekomendasi yang memakai konteks BMKG.</p>
+
+                                    <div class="rl-mega-stat rl-cyan-glow" data-watermark="BMKG">
+                                        <div class="rl-mega-stat-head">
+                                            <div class="rl-mega-icon">☁</div>
+                                            <div>
+                                                <div class="rl-mega-topline">Weather Intelligence</div>
+                                                <div class="rl-mega-value">{{ $formatPercent($bmkgRate) }}</div>
+                                            </div>
+                                            <span class="rl-mega-status-chip">Context</span>
+                                        </div>
+                                        <p class="rl-mega-desc">Persentase rekomendasi yang memakai konteks cuaca BMKG/ADM4.</p>
+                                        <div class="rl-mega-microbar" style="--rl-bar-width: {{ $bmkgRate }}%;"><span></span></div>
+                                        <div class="rl-mega-foot">
+                                            <span class="rl-mega-foot-pill">{{ $formatNumber($safe('bmkg_count')) }} log</span>
+                                            <span class="rl-mega-foot-pill">BMKG active</span>
+                                        </div>
                                     </div>
+
                                     <div class="rl-mega-stat rl-blue-glow" data-watermark="MS">
-                                        <div class="rl-small-label">Response Mood</div>
-                                        <div class="rl-mega-value">{{ $formatMs($safe('avg_response')) }}</div>
-                                        <p class="rl-mega-desc">{{ $responseHealth }} berdasarkan rata-rata response time.</p>
+                                        <div class="rl-mega-stat-head">
+                                            <div class="rl-mega-icon">↯</div>
+                                            <div>
+                                                <div class="rl-mega-topline">Response Mood</div>
+                                                <div class="rl-mega-value">{{ $formatMs($safe('avg_response')) }}</div>
+                                            </div>
+                                            <span class="rl-mega-status-chip">Speed</span>
+                                        </div>
+                                        <p class="rl-mega-desc">{{ $responseHealth }} berdasarkan rata-rata response time rekomendasi.</p>
+                                        <div class="rl-mega-microbar" style="--rl-bar-width: {{ $responseGauge }}%;"><span></span></div>
+                                        <div class="rl-mega-foot">
+                                            <span class="rl-mega-foot-pill">fastest {{ $formatMs($safe('fastest_response')) }}</span>
+                                            <span class="rl-mega-foot-pill">slowest {{ $formatMs($safe('slowest_response')) }}</span>
+                                        </div>
                                     </div>
                                 </div>
 

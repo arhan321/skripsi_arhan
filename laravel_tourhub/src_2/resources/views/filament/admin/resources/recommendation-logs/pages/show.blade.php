@@ -2,6 +2,31 @@
     @php
         $log = $this->record ?? (isset($record) ? $record : null);
 
+        $requestUser = $log?->user;
+        $requestUserName = $requestUser?->name ?: 'Guest / Unknown';
+        $requestUserEmail = $requestUser?->email ?: '-';
+        $requestUserId = $requestUser?->id ?: '-';
+        $requestUserCreatedAt = $requestUser?->created_at?->format('d M Y H:i') ?? '-';
+        $requestUserVerifiedAt = $requestUser?->email_verified_at?->format('d M Y H:i') ?? '-';
+        $requestUserRoles = '-';
+
+        if ($requestUser && method_exists($requestUser, 'roles')) {
+            try {
+                $roleText = $requestUser->roles?->pluck('name')->filter()->implode(', ');
+                $requestUserRoles = filled($roleText) ? $roleText : '-';
+            } catch (\Throwable $exception) {
+                $requestUserRoles = '-';
+            }
+        }
+
+        $requestUserInitials = collect(preg_split('/\s+/', trim((string) $requestUserName)))
+            ->filter()
+            ->take(2)
+            ->map(fn ($word) => strtoupper(substr((string) $word, 0, 1)))
+            ->implode('');
+
+        $requestUserInitials = filled($requestUserInitials) ? $requestUserInitials : 'U';
+
         $requestPayload = (array) ($log?->request_payload ?? []);
         $responsePayload = (array) ($log?->response_payload ?? []);
 
@@ -78,6 +103,30 @@
         $useBmkg = (bool) data_get($requestPayload, 'use_bmkg', false);
         $bmkgAdm4 = data_get($requestPayload, 'bmkg_adm4');
         $isHighSeason = (bool) data_get($requestPayload, 'is_high_season', false);
+
+        $clientPlatform = data_get($requestPayload, 'platform')
+            ?: data_get($requestPayload, 'client_platform')
+            ?: data_get($requestPayload, 'device')
+            ?: data_get($requestPayload, 'client')
+            ?: '-';
+
+        $clientVersion = data_get($requestPayload, 'app_version')
+            ?: data_get($requestPayload, 'version')
+            ?: data_get($requestPayload, 'build_number')
+            ?: '-';
+
+        $requestLatitude = data_get($requestPayload, 'latitude')
+            ?? data_get($requestPayload, 'lat')
+            ?? data_get($requestPayload, 'user_latitude');
+
+        $requestLongitude = data_get($requestPayload, 'longitude')
+            ?? data_get($requestPayload, 'lon')
+            ?? data_get($requestPayload, 'lng')
+            ?? data_get($requestPayload, 'user_longitude');
+
+        $requestCoordinate = (filled($requestLatitude) && filled($requestLongitude))
+            ? $formatDecimal($requestLatitude, 6) . ', ' . $formatDecimal($requestLongitude, 6)
+            : '-';
 
         $weatherSource = $log?->weather_source ?? data_get($responsePayload, 'weather_source');
         $weatherUsed = $log?->weather_used ?? data_get($responsePayload, 'weather_used');
@@ -353,6 +402,342 @@
             color: var(--th-ink);
             background: var(--th-soft);
             border: 1px solid var(--th-line);
+        }
+
+        .th-user-console {
+            position: relative;
+            overflow: hidden;
+            border-radius: 30px;
+            padding: 1.25rem;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, .13);
+            background:
+                radial-gradient(circle at 5% 8%, rgba(34, 211, 238, .32), transparent 26%),
+                radial-gradient(circle at 96% 20%, rgba(168, 85, 247, .26), transparent 29%),
+                radial-gradient(circle at 60% 120%, rgba(16, 185, 129, .20), transparent 34%),
+                linear-gradient(135deg, #020617 0%, #0f172a 42%, #111827 100%);
+            box-shadow: 0 28px 70px rgba(2, 6, 23, .22);
+        }
+
+        .th-user-console::before,
+        .th-user-console::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .th-user-console::before {
+            opacity: .16;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, .20) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, .20) 1px, transparent 1px);
+            background-size: 34px 34px;
+            mask-image: radial-gradient(circle at top left, black, transparent 78%);
+        }
+
+        .th-user-console::after {
+            background:
+                linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, .08) 38%, transparent 72%);
+            transform: translateX(-85%);
+            animation: thUserSweep 7s linear infinite;
+        }
+
+        @keyframes thUserSweep {
+            0% { transform: translateX(-90%); }
+            48% { transform: translateX(128%); }
+            100% { transform: translateX(128%); }
+        }
+
+        .th-user-bg-text {
+            position: absolute;
+            right: 1rem;
+            top: -.55rem;
+            color: rgba(255, 255, 255, .035);
+            font-size: clamp(4rem, 12vw, 10rem);
+            line-height: 1;
+            font-weight: 1000;
+            letter-spacing: -.08em;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .th-user-orb {
+            position: absolute;
+            width: 18rem;
+            height: 18rem;
+            border-radius: 999px;
+            filter: blur(62px);
+            pointer-events: none;
+            opacity: .28;
+        }
+
+        .th-user-orb.one {
+            left: -8rem;
+            top: -8rem;
+            background: #22d3ee;
+        }
+
+        .th-user-orb.two {
+            right: -7rem;
+            bottom: -9rem;
+            background: #8b5cf6;
+        }
+
+        .th-user-console-inner {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .th-user-head {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        @media (min-width: 900px) {
+            .th-user-head {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+        }
+
+        .th-user-profile {
+            display: flex;
+            align-items: center;
+            gap: .95rem;
+            min-width: 0;
+        }
+
+        .th-user-avatar {
+            position: relative;
+            width: 4.6rem;
+            height: 4.6rem;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 1.45rem;
+            color: #020617;
+            background:
+                radial-gradient(circle at 30% 20%, #ffffff, transparent 28%),
+                linear-gradient(135deg, #67e8f9, #34d399 46%, #fbbf24);
+            border: 1px solid rgba(255, 255, 255, .42);
+            box-shadow: 0 18px 42px rgba(34, 211, 238, .22);
+            font-size: 1.42rem;
+            font-weight: 1000;
+            letter-spacing: -.035em;
+        }
+
+        .th-user-avatar::after {
+            content: "";
+            position: absolute;
+            inset: -.35rem;
+            border-radius: 1.75rem;
+            border: 1px solid rgba(255, 255, 255, .12);
+        }
+
+        .th-user-kicker {
+            margin: 0;
+            color: #a5f3fc;
+            font-size: .72rem;
+            line-height: 1rem;
+            font-weight: 950;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+        }
+
+        .th-user-name {
+            margin: .3rem 0 0;
+            color: white;
+            font-size: clamp(1.4rem, 2.2vw, 2.2rem);
+            line-height: 1.05;
+            font-weight: 1000;
+            letter-spacing: -.045em;
+            word-break: break-word;
+        }
+
+        .th-user-meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+            margin-top: .55rem;
+        }
+
+        .th-user-meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .38rem;
+            border-radius: 999px;
+            padding: .42rem .68rem;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .12);
+            color: #e2e8f0;
+            font-size: .72rem;
+            line-height: 1rem;
+            font-weight: 850;
+            max-width: 100%;
+        }
+
+        .th-user-status-card {
+            min-width: min(100%, 17rem);
+            border-radius: 1.35rem;
+            padding: .95rem 1rem;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .13);
+            backdrop-filter: blur(16px);
+        }
+
+        .th-user-status-label {
+            color: #94a3b8;
+            font-size: .68rem;
+            font-weight: 950;
+            line-height: 1rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .th-user-status-value {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            margin-top: .35rem;
+            color: white;
+            font-size: 1.05rem;
+            font-weight: 1000;
+        }
+
+        .th-user-live-dot {
+            width: .65rem;
+            height: .65rem;
+            border-radius: 999px;
+            background: #34d399;
+            box-shadow: 0 0 18px rgba(52, 211, 153, .95);
+        }
+
+        .th-user-grid {
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 760px) {
+            .th-user-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1180px) {
+            .th-user-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        .th-user-field {
+            position: relative;
+            overflow: hidden;
+            min-height: 6.1rem;
+            border-radius: 1.2rem;
+            padding: .92rem;
+            background: rgba(255, 255, 255, .075);
+            border: 1px solid rgba(255, 255, 255, .12);
+            backdrop-filter: blur(14px);
+        }
+
+        .th-user-field::after {
+            content: "";
+            position: absolute;
+            right: -2rem;
+            bottom: -2.2rem;
+            width: 5.5rem;
+            height: 5.5rem;
+            border-radius: 999px;
+            background: rgba(34, 211, 238, .12);
+            filter: blur(5px);
+        }
+
+        .th-user-field-label {
+            position: relative;
+            z-index: 1;
+            color: #94a3b8;
+            font-size: .67rem;
+            line-height: 1rem;
+            font-weight: 950;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .th-user-field-value {
+            position: relative;
+            z-index: 1;
+            margin-top: .38rem;
+            color: white;
+            font-size: .96rem;
+            line-height: 1.35;
+            font-weight: 950;
+            word-break: break-word;
+        }
+
+        .th-user-field-note {
+            position: relative;
+            z-index: 1;
+            margin: .35rem 0 0;
+            color: #94a3b8;
+            font-size: .72rem;
+            line-height: 1.4;
+            font-weight: 700;
+        }
+
+        .th-user-trace {
+            display: grid;
+            gap: .7rem;
+            border-radius: 1.2rem;
+            padding: .85rem;
+            background: rgba(2, 6, 23, .45);
+            border: 1px solid rgba(255, 255, 255, .10);
+        }
+
+        @media (min-width: 900px) {
+            .th-user-trace {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        .th-user-trace-step {
+            position: relative;
+            display: flex;
+            gap: .65rem;
+            align-items: flex-start;
+            min-width: 0;
+        }
+
+        .th-user-trace-icon {
+            width: 2rem;
+            height: 2rem;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: .8rem;
+            background: rgba(255, 255, 255, .10);
+            border: 1px solid rgba(255, 255, 255, .12);
+        }
+
+        .th-user-trace-title {
+            color: white;
+            font-size: .78rem;
+            line-height: 1.25;
+            font-weight: 950;
+        }
+
+        .th-user-trace-text {
+            margin-top: .18rem;
+            color: #94a3b8;
+            font-size: .7rem;
+            line-height: 1.35;
+            font-weight: 700;
+            word-break: break-word;
         }
 
         .th-grid-4 {
@@ -1027,6 +1412,7 @@
 
                     <div class="th-hero-meta">
                         <span class="th-meta">#{{ $log?->id ?? '-' }}</span>
+                        <span class="th-meta">👤 {{ $requestUserName }}</span>
                         <span class="th-meta">🕒 {{ $createdAt }}</span>
                         <span class="th-meta">📌 {{ $resultLimitText }}</span>
                     </div>
@@ -1059,6 +1445,123 @@
                         <p class="th-score-value">
                             {{ filled($responseTimeMs) ? number_format((int) $responseTimeMs, 0, ',', '.') . ' ms' : '-' }}
                         </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="th-user-console">
+            <span class="th-user-orb one"></span>
+            <span class="th-user-orb two"></span>
+            <div class="th-user-bg-text">USER</div>
+
+            <div class="th-user-console-inner">
+                <div class="th-user-head">
+                    <div class="th-user-profile">
+                        <div class="th-user-avatar">{{ $requestUserInitials }}</div>
+
+                        <div style="min-width: 0;">
+                            <p class="th-user-kicker">Request Owner / User Identity</p>
+                            <h2 class="th-user-name">{{ $requestUserName }}</h2>
+
+                            <div class="th-user-meta-row">
+                                <span class="th-user-meta-pill">🆔 User ID: {{ $requestUserId }}</span>
+                                <span class="th-user-meta-pill">✉️ {{ $requestUserEmail }}</span>
+                                <span class="th-user-meta-pill">🛡️ Role: {{ $requestUserRoles }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="th-user-status-card">
+                        <div class="th-user-status-label">Request Link Status</div>
+                        <div class="th-user-status-value">
+                            <span class="th-user-live-dot"></span>
+                            {{ $requestUser ? 'Terhubung ke akun user' : 'Guest / user tidak terbaca' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="th-user-grid">
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Nama User</div>
+                        <div class="th-user-field-value">{{ $requestUserName }}</div>
+                        <p class="th-user-field-note">Akun yang melakukan request rekomendasi ini.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Email User</div>
+                        <div class="th-user-field-value">{{ $requestUserEmail }}</div>
+                        <p class="th-user-field-note">Email akun dari tabel users Laravel.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Waktu Request</div>
+                        <div class="th-user-field-value">{{ $createdAt }}</div>
+                        <p class="th-user-field-note">Waktu log rekomendasi dibuat oleh sistem.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Member Since</div>
+                        <div class="th-user-field-value">{{ $requestUserCreatedAt }}</div>
+                        <p class="th-user-field-note">Tanggal akun user dibuat.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Email Verified</div>
+                        <div class="th-user-field-value">{{ $requestUserVerifiedAt }}</div>
+                        <p class="th-user-field-note">Status verifikasi email jika tersedia.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Platform / Client</div>
+                        <div class="th-user-field-value">{{ $clientPlatform }}</div>
+                        <p class="th-user-field-note">Diambil dari request payload jika dikirim mobile/web.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">App Version</div>
+                        <div class="th-user-field-value">{{ $clientVersion }}</div>
+                        <p class="th-user-field-note">Versi aplikasi jika tersedia pada payload.</p>
+                    </div>
+
+                    <div class="th-user-field">
+                        <div class="th-user-field-label">Koordinat User</div>
+                        <div class="th-user-field-value">{{ $requestCoordinate }}</div>
+                        <p class="th-user-field-note">Latitude dan longitude user saat request jika tersedia.</p>
+                    </div>
+                </div>
+
+                <div class="th-user-trace">
+                    <div class="th-user-trace-step">
+                        <div class="th-user-trace-icon">👤</div>
+                        <div>
+                            <div class="th-user-trace-title">User Request</div>
+                            <div class="th-user-trace-text">{{ $requestUserName }} mengirim preferensi wisata.</div>
+                        </div>
+                    </div>
+
+                    <div class="th-user-trace-step">
+                        <div class="th-user-trace-icon">🧭</div>
+                        <div>
+                            <div class="th-user-trace-title">Context Filter</div>
+                            <div class="th-user-trace-text">{{ $kabupatenKota ?: 'Semua wilayah' }} • {{ $weatherLabel($weatherUsed) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="th-user-trace-step">
+                        <div class="th-user-trace-icon">⚙️</div>
+                        <div>
+                            <div class="th-user-trace-title">Laravel → FastAPI</div>
+                            <div class="th-user-trace-text">{{ filled($responseTimeMs) ? number_format((int) $responseTimeMs, 0, ',', '.') . ' ms' : 'response belum tersedia' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="th-user-trace-step">
+                        <div class="th-user-trace-icon">🏆</div>
+                        <div>
+                            <div class="th-user-trace-title">Top Result</div>
+                            <div class="th-user-trace-text">{{ $bestName }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
