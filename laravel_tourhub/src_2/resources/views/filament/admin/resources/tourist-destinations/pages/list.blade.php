@@ -2132,8 +2132,10 @@
                                 </div>
 
                                 <h2 class="th-title">
-                                    <span class="th-title-gradient">Command Center</span>
-                                    Data Wisata TourHub Bali
+                                    <span class="th-title-gradient">
+                                    Data Wisata 
+                                    </span>
+                                    TourHub Bali
                                 </h2>
 
                                 <p class="th-subtitle">

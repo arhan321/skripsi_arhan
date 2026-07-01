@@ -1990,7 +1990,8 @@
                             </div>
 
                             <h2 class="rl-title">
-                                Command Center <span class="rl-gradient-text">Log Rekomendasi</span> TourHub Bali
+                                {{-- Command Center  --}}
+                                <span class="rl-gradient-text">Log Rekomendasi</span> TourHub Bali
                             </h2>
 
                             <p class="rl-subtitle">
@@ -2225,7 +2226,9 @@
                     <div class="rl-cockpit-inner">
                         <div class="rl-section-kicker" style="color:#a7f3d0;">Execution Console</div>
                         <h3 class="rl-section-title">Live Recommendation Trace</h3>
-                        <p class="rl-section-subtitle">Ringkasan log paling penting dalam gaya terminal agar halaman tidak terasa seperti tabel admin biasa.</p>
+                        <p class="rl-section-subtitle">
+                        {{-- Ringkasan log paling penting dalam gaya terminal agar halaman tidak terasa seperti tabel admin biasa. --}}
+                        </p>
 
                         <div class="rl-terminal-window" style="margin-top:1rem;">
                             <div class="rl-terminal-header">
