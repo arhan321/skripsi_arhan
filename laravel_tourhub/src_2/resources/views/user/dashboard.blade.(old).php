@@ -512,8 +512,141 @@
     @endif
 
 
-{{-- Rating System Dashboard Form --}}
-@if (! $latestSystemRating && $pendingRatingLog)
+{{-- Rating System Dashboard Status --}}
+@if ($latestSystemRating)
+    <section id="rating-system-dashboard" class="dashboard-system-rating-shell mt-6 overflow-hidden">
+        <span class="dashboard-system-rating-float-star dashboard-system-rating-float-star--one">★</span>
+        <span class="dashboard-system-rating-float-star dashboard-system-rating-float-star--two">★</span>
+
+        <div class="border-b border-emerald-100/80 p-6 md:p-7">
+            <div class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
+                <div class="lg:col-span-8">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">
+                        <span>💚</span>
+                        Rating Sistem TourHub
+                    </span>
+
+                    <h2 class="mt-4 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+                        Terima kasih sudah menilai sistem TourHub
+                    </h2>
+
+                    <p class="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
+                        Rating kamu sudah tersimpan sebagai penilaian kualitas sistem rekomendasi TourHub secara keseluruhan.
+                        Karena konsepnya satu user cukup memberi satu rating, form permintaan rating tidak akan muncul lagi di dashboard.
+                    </p>
+
+                    <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
+                        <span class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">
+                            Diberikan pada {{ $latestSystemRating->rated_at?->format('d M Y H:i') ?? $latestSystemRating->created_at?->format('d M Y H:i') ?? '-' }}
+                        </span>
+
+                        <span class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">
+                            {{ $dashboardSystemRatingLabel((int) $latestSystemRating->rating) }}
+                        </span>
+
+                        @if ($latestSystemRating->recommendation_log_id)
+                            <span class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">
+                                Konteks riwayat #{{ $latestSystemRating->recommendation_log_id }}
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="lg:col-span-4">
+                    <div class="rounded-[1.55rem] border border-emerald-200 bg-white/90 p-5 text-center shadow-sm backdrop-blur">
+                        <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Rating Kamu</p>
+                        <p class="mt-1 text-4xl font-black text-emerald-600">
+                            {{ (int) $latestSystemRating->rating }}/5
+                        </p>
+                        <p class="mt-2 text-lg font-black leading-none text-amber-500">
+                            {{ $starText((int) $latestSystemRating->rating) }}
+                        </p>
+                        <p class="mt-2 text-xs font-black text-emerald-700">
+                            {{ $dashboardSystemRatingLabel((int) $latestSystemRating->rating) }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 md:p-7">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                <div class="dashboard-system-rating-card p-5 md:p-6 lg:col-span-8">
+                    <div class="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-3xl text-emerald-700 ring-1 ring-emerald-200">
+                                ✅
+                            </div>
+
+                            <div>
+                                <p class="text-sm font-black text-slate-950">
+                                    Penilaianmu membantu evaluasi sistem rekomendasi.
+                                </p>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">
+                                    Masukan ini bisa dipakai sebagai data pendukung untuk melihat apakah sistem rekomendasi TourHub sudah membantu user dalam memilih destinasi wisata Bali.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl bg-emerald-50 px-4 py-3 text-center ring-1 ring-emerald-100">
+                            <p class="text-xs font-bold tracking-wide text-emerald-700 uppercase">Status</p>
+                            <p class="mt-1 text-sm font-black text-emerald-800">Sudah memberi rating</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <p class="text-xs font-black tracking-wide text-slate-500 uppercase">
+                                    Komentar dari kamu
+                                </p>
+
+                                @if (trim((string) $latestSystemRating->comment) !== '')
+                                    <p class="mt-3 text-sm font-semibold leading-7 text-slate-700">
+                                        “{{ $latestSystemRating->comment }}”
+                                    </p>
+                                @else
+                                    <p class="mt-3 text-sm font-semibold leading-7 text-slate-500">
+                                        Kamu belum menambahkan komentar tambahan. Rating bintang kamu tetap sudah tersimpan.
+                                    </p>
+                                @endif
+                            </div>
+
+                            {{-- <div class="shrink-0 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                                <p class="text-xs font-bold text-slate-500">Platform</p>
+                                <p class="mt-1 text-sm font-black text-slate-950">
+                                    {{ ucfirst((string) ($latestSystemRating->platform ?? 'web')) }}
+                                </p>
+                            </div> --}}
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="dashboard-system-rating-card p-5 md:p-6 lg:col-span-4">
+                    <p class="text-sm font-black text-slate-950">
+                        Ringkasan rating sistem
+                    </p>
+
+                    <div class="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                            <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Nilai</p>
+                            <p class="mt-1 text-xl font-black text-slate-950">
+                                {{ (int) $latestSystemRating->rating }}/5 - {{ $dashboardSystemRatingLabel((int) $latestSystemRating->rating) }}
+                            </p>
+                        </div>
+
+                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                            <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Makna rating</p>
+                            <p class="mt-1 text-sm font-semibold text-slate-600">
+                                {{ $dashboardSystemRatingDescription((int) $latestSystemRating->rating) }}
+                            </p>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </section>
+@elseif ($pendingRatingLog)
     <section id="rating-system-dashboard" class="dashboard-system-rating-shell mt-6">
         <span class="dashboard-system-rating-float-star dashboard-system-rating-float-star--one">★</span>
         <span class="dashboard-system-rating-float-star dashboard-system-rating-float-star--two">★</span>
@@ -687,12 +820,12 @@
                                     Kirim Rating Sistem
                                 </button>
 
-                                <a
+                                {{-- <a
                                     href="{{ route('user.recommendation-history.show', $pendingRatingLog) }}#rating-system"
                                     class="inline-flex w-full items-center justify-center rounded-2xl bg-blue-50 px-5 py-3 text-sm font-black text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100 sm:w-auto"
                                 >
                                     Lihat Detail Riwayat
-                                </a>
+                                </a> --}}
                             </div>
                         </form>
                     </div>
@@ -988,143 +1121,6 @@
             </div>
         @endif
     </section>
-
-
-{{-- Rating System Dashboard Thank You - posisi bawah halaman --}}
-@if ($latestSystemRating)
-    <section id="rating-system-dashboard" class="dashboard-system-rating-shell mt-6 overflow-hidden">
-        <span class="dashboard-system-rating-float-star dashboard-system-rating-float-star--one">★</span>
-        <span class="dashboard-system-rating-float-star dashboard-system-rating-float-star--two">★</span>
-
-        <div class="border-b border-emerald-100/80 p-6 md:p-7">
-            <div class="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
-                <div class="lg:col-span-8">
-                    <span class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">
-                        <span>💚</span>
-                        Rating Sistem TourHub
-                    </span>
-
-                    <h2 class="mt-4 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
-                        Terima kasih sudah menilai sistem TourHub
-                    </h2>
-
-                    <p class="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                        Rating kamu sudah tersimpan sebagai penilaian kualitas sistem rekomendasi TourHub secara keseluruhan.
-                        Karena konsepnya satu user cukup memberi satu rating, form permintaan rating tidak akan muncul lagi di dashboard.
-                    </p>
-
-                    <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
-                        <span class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">
-                            Diberikan pada {{ $latestSystemRating->rated_at?->format('d M Y H:i') ?? $latestSystemRating->created_at?->format('d M Y H:i') ?? '-' }}
-                        </span>
-
-                        <span class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">
-                            {{ $dashboardSystemRatingLabel((int) $latestSystemRating->rating) }}
-                        </span>
-
-                        @if ($latestSystemRating->recommendation_log_id)
-                            <span class="rounded-full bg-white px-3 py-1.5 text-slate-700 ring-1 ring-slate-200">
-                                Konteks riwayat #{{ $latestSystemRating->recommendation_log_id }}
-                            </span>
-                        @endif
-                    </div>
-                </div>
-
-                <div class="lg:col-span-4">
-                    <div class="rounded-[1.55rem] border border-emerald-200 bg-white/90 p-5 text-center shadow-sm backdrop-blur">
-                        <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Rating Kamu</p>
-                        <p class="mt-1 text-4xl font-black text-emerald-600">
-                            {{ (int) $latestSystemRating->rating }}/5
-                        </p>
-                        <p class="mt-2 text-lg font-black leading-none text-amber-500">
-                            {{ $starText((int) $latestSystemRating->rating) }}
-                        </p>
-                        <p class="mt-2 text-xs font-black text-emerald-700">
-                            {{ $dashboardSystemRatingLabel((int) $latestSystemRating->rating) }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="p-6 md:p-7">
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                <div class="dashboard-system-rating-card p-5 md:p-6 lg:col-span-8">
-                    <div class="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                        <div class="flex items-start gap-4">
-                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-3xl text-emerald-700 ring-1 ring-emerald-200">
-                                ✅
-                            </div>
-
-                            <div>
-                                <p class="text-sm font-black text-slate-950">
-                                    Penilaianmu membantu evaluasi sistem rekomendasi.
-                                </p>
-                                <p class="mt-2 text-sm leading-6 text-slate-600">
-                                    Masukan ini bisa dipakai sebagai data pendukung untuk melihat apakah sistem rekomendasi TourHub sudah membantu user dalam memilih destinasi wisata Bali.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl bg-emerald-50 px-4 py-3 text-center ring-1 ring-emerald-100">
-                            <p class="text-xs font-bold tracking-wide text-emerald-700 uppercase">Status</p>
-                            <p class="mt-1 text-sm font-black text-emerald-800">Sudah memberi rating</p>
-                        </div>
-                    </div>
-
-                    <div class="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                            <div>
-                                <p class="text-xs font-black tracking-wide text-slate-500 uppercase">
-                                    Komentar dari kamu
-                                </p>
-
-                                @if (trim((string) $latestSystemRating->comment) !== '')
-                                    <p class="mt-3 text-sm font-semibold leading-7 text-slate-700">
-                                        “{{ $latestSystemRating->comment }}”
-                                    </p>
-                                @else
-                                    <p class="mt-3 text-sm font-semibold leading-7 text-slate-500">
-                                        Kamu belum menambahkan komentar tambahan. Rating bintang kamu tetap sudah tersimpan.
-                                    </p>
-                                @endif
-                            </div>
-
-                            <div class="shrink-0 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                                <p class="text-xs font-bold text-slate-500">Platform</p>
-                                <p class="mt-1 text-sm font-black text-slate-950">
-                                    {{ ucfirst((string) ($latestSystemRating->platform ?? 'web')) }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <aside class="dashboard-system-rating-card p-5 md:p-6 lg:col-span-4">
-                    <p class="text-sm font-black text-slate-950">
-                        Ringkasan rating sistem
-                    </p>
-
-                    <div class="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                            <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Nilai</p>
-                            <p class="mt-1 text-xl font-black text-slate-950">
-                                {{ (int) $latestSystemRating->rating }}/5 - {{ $dashboardSystemRatingLabel((int) $latestSystemRating->rating) }}
-                            </p>
-                        </div>
-
-                        <div class="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                            <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Makna rating</p>
-                            <p class="mt-1 text-sm font-semibold text-slate-600">
-                                {{ $dashboardSystemRatingDescription((int) $latestSystemRating->rating) }}
-                            </p>
-                        </div>
-                    </div>
-                </aside>
-            </div>
-        </div>
-    </section>
-@endif
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {

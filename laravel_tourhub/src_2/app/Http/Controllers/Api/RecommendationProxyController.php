@@ -6,7 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\RecommendationLog;
+use App\Models\SystemRating;
 use App\Services\TourHubMlService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -14,7 +16,7 @@ use Throwable;
 
 final class RecommendationProxyController extends Controller
 {
-    public function __invoke(Request $request, TourHubMlService $ml)
+    public function __invoke(Request $request, TourHubMlService $ml): JsonResponse
     {
         $payload = $request->validate([
             'kategori_preferensi' => ['required', 'array', 'min:1'],
@@ -50,7 +52,7 @@ final class RecommendationProxyController extends Controller
             $result = $ml->recommend($payload);
             $responseTimeMs = (int) round((microtime(true) - $startedAt) * 1000);
 
-            RecommendationLog::create([
+            $recommendationLog = RecommendationLog::create([
                 'user_id' => Auth::id(),
                 'weather_source' => data_get($result, 'weather_source'),
                 'weather_used' => data_get($result, 'weather_used'),
@@ -61,9 +63,35 @@ final class RecommendationProxyController extends Controller
                 'status' => 'success',
             ]);
 
+            $hasSystemRating = Auth::check()
+                && SystemRating::query()
+                    ->where('user_id', Auth::id())
+                    ->exists();
+
+            $requiresSystemRating = ! $hasSystemRating;
+
             return response()->json([
                 'success' => true,
+                'message' => $requiresSystemRating
+                    ? 'Rekomendasi berhasil dibuat. Silakan beri rating satu kali untuk menilai kualitas sistem rekomendasi TourHub.'
+                    : 'Rekomendasi berhasil dibuat.',
                 'response_time_ms' => $responseTimeMs,
+                'recommendation_log_id' => $recommendationLog->id,
+                'requires_system_rating' => $requiresSystemRating,
+                'rating_prompt' => $requiresSystemRating ? [
+                    'show' => true,
+                    'recommendation_log_id' => $recommendationLog->id,
+                    'title' => 'Bagaimana pengalaman menggunakan sistem rekomendasi TourHub?',
+                    'message' => 'Beri rating satu kali untuk menilai kualitas sistem rekomendasi TourHub secara keseluruhan.',
+                    'scale' => [
+                        'min' => 1,
+                        'max' => 5,
+                        'label_min' => 'Kurang membantu',
+                        'label_max' => 'Sangat membantu',
+                    ],
+                    'endpoint' => '/api/tourhub/system-ratings',
+                    'method' => 'POST',
+                ] : null,
                 'data' => $result,
             ]);
         } catch (Throwable $e) {

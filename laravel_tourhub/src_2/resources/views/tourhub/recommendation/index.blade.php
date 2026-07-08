@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>TourHub Bali - Rekomendasi Wisata</title>
+        <meta name="csrf-token" content="{{ csrf_token() }}" />
         <script src="https://cdn.tailwindcss.com"></script>
 
         <style>
@@ -316,7 +317,123 @@
                 transform: rotate(180deg);
             }
 
-            @media (prefers-reduced-motion: reduce) {
+            
+
+            /* =========================================================
+               Rating Sistem TourHub
+               Tujuan:
+               - user bisa menilai kualitas sistem rekomendasi setelah
+                 rekomendasi berhasil dibuat
+               - tidak mengubah logic rekomendasi/wishlist yang sudah ada
+               - modal tetap rapi di desktop dan mobile
+            ========================================================= */
+            .tourhub-system-rating-card {
+                position: relative;
+                overflow: hidden;
+                border-radius: 2rem;
+                border: 1px solid rgba(191, 219, 254, 0.95);
+                background:
+                    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 34%),
+                    linear-gradient(135deg, rgb(255, 255, 255), rgb(239, 246, 255));
+                box-shadow:
+                    0 18px 48px rgba(15, 23, 42, 0.08),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+            }
+
+            .tourhub-system-rating-card::before {
+                content: '';
+                position: absolute;
+                inset: auto -6rem -7rem auto;
+                width: 16rem;
+                height: 16rem;
+                border-radius: 9999px;
+                background: rgba(251, 191, 36, 0.18);
+                pointer-events: none;
+            }
+
+            .tourhub-system-rating-modal {
+                position: fixed;
+                inset: 0;
+                z-index: 90;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                padding: 1rem;
+                opacity: 0;
+                transition: opacity 240ms ease;
+            }
+
+            .tourhub-system-rating-modal.is-open {
+                display: flex;
+                opacity: 1;
+            }
+
+            .tourhub-system-rating-backdrop {
+                position: absolute;
+                inset: 0;
+                background: rgba(2, 6, 23, 0.68);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+            }
+
+            .tourhub-system-rating-panel {
+                position: relative;
+                width: min(100%, 34rem);
+                max-height: calc(100vh - 2rem);
+                overflow-y: auto;
+                border-radius: 2rem;
+                background: rgb(255, 255, 255);
+                box-shadow:
+                    0 28px 90px rgba(2, 6, 23, 0.36),
+                    0 2px 8px rgba(2, 6, 23, 0.12);
+                transform: translateY(14px) scale(0.98);
+                transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+            }
+
+            .tourhub-system-rating-modal.is-open .tourhub-system-rating-panel {
+                transform: translateY(0) scale(1);
+            }
+
+            .tourhub-system-rating-star-input:checked + .tourhub-system-rating-star-label,
+            .tourhub-system-rating-star-label.is-active {
+                background: rgb(251, 191, 36);
+                color: rgb(15, 23, 42);
+                border-color: rgb(245, 158, 11);
+                box-shadow: 0 14px 30px rgba(245, 158, 11, 0.22);
+                transform: translateY(-2px) scale(1.04);
+            }
+
+            .tourhub-system-rating-star-label {
+                display: inline-flex;
+                width: 3rem;
+                height: 3rem;
+                align-items: center;
+                justify-content: center;
+                border-radius: 1rem;
+                border: 1px solid rgb(226, 232, 240);
+                background: rgb(248, 250, 252);
+                color: rgb(148, 163, 184);
+                font-size: 1.45rem;
+                cursor: pointer;
+                transition:
+                    transform 180ms ease,
+                    background-color 180ms ease,
+                    color 180ms ease,
+                    border-color 180ms ease,
+                    box-shadow 180ms ease;
+            }
+
+            .tourhub-system-rating-star-label:hover {
+                transform: translateY(-2px);
+                background: rgb(254, 243, 199);
+                color: rgb(146, 64, 14);
+                border-color: rgb(252, 211, 77);
+            }
+
+            .tourhub-rating-lock {
+                overflow: hidden;
+            }
+@media (prefers-reduced-motion: reduce) {
                 .tourhub-mobile-menu-panel,
                 .tourhub-menu-line,
                 .tourhub-menu-button,
@@ -716,6 +833,93 @@
                         return false;
                     }
                 };
+
+
+                /*
+                 * =========================================================
+                 * Logic Rating Sistem TourHub
+                 * Catatan:
+                 * - Ini rating untuk kualitas sistem rekomendasi secara keseluruhan.
+                 * - Konsep terbaru: satu user cukup memberi rating satu kali saja.
+                 * - Modal hanya tampil jika user login, hasil rekomendasi berhasil muncul,
+                 *   dan user tersebut belum pernah memberi rating sistem sama sekali.
+                 * - recommendation_log_id tetap dikirim sebagai konteks riwayat terakhir,
+                 *   tetapi pengecekan "sudah rating / belum" berbasis user_id saja.
+                 * =========================================================
+                 */
+                $systemRatingApiEndpoint = url('/api/tourhub/system-ratings');
+                $systemRatingStatusEndpoint = url('/api/tourhub/system-ratings/status');
+
+                $systemRatingRecommendationLogId = data_get($result ?? [], 'recommendation_log_id')
+                    ?? data_get($result ?? [], 'data.recommendation_log_id')
+                    ?? data_get($result ?? [], 'rating_prompt.recommendation_log_id')
+                    ?? data_get($result ?? [], 'data.rating_prompt.recommendation_log_id')
+                    ?? $wishlistActiveLogId;
+
+                $systemRatingRecommendationLogId = $systemRatingRecommendationLogId
+                    ? (int) $systemRatingRecommendationLogId
+                    : null;
+
+                $systemRatingTableAvailable = false;
+
+                try {
+                    $systemRatingTableAvailable = class_exists(\App\Models\SystemRating::class)
+                        && \Illuminate\Support\Facades\Schema::hasTable('system_ratings');
+                } catch (\Throwable $exception) {
+                    $systemRatingTableAvailable = false;
+                }
+
+                $hasSystemRating = false;
+                $currentSystemRating = null;
+
+                if (auth()->check() && $systemRatingTableAvailable) {
+                    try {
+                        $currentSystemRating = \App\Models\SystemRating::query()
+                            ->where('user_id', auth()->id())
+                            ->latest('rated_at')
+                            ->latest('updated_at')
+                            ->first();
+
+                        $hasSystemRating = $currentSystemRating !== null;
+                    } catch (\Throwable $exception) {
+                        $currentSystemRating = null;
+                        $hasSystemRating = false;
+                    }
+                }
+
+                $systemRatingResultAvailable = isset($result)
+                    && collect(data_get($result ?? [], 'recommendations', []))->count() > 0;
+
+                $shouldAskSystemRating = auth()->check()
+                    && $systemRatingTableAvailable
+                    && $systemRatingResultAvailable
+                    && $systemRatingRecommendationLogId
+                    && ! $hasSystemRating;
+
+                $systemRatingPromptTitle = data_get(
+                    $result ?? [],
+                    'rating_prompt.title',
+                    'Bagaimana pengalaman rekomendasi TourHub?'
+                );
+
+                $systemRatingPromptMessage = data_get(
+                    $result ?? [],
+                    'rating_prompt.message',
+                    'Beri rating untuk membantu kami mengevaluasi kualitas sistem rekomendasi.'
+                );
+
+                $systemRatingLabelMin = data_get(
+                    $result ?? [],
+                    'rating_prompt.scale.label_min',
+                    'Kurang membantu'
+                );
+
+                $systemRatingLabelMax = data_get(
+                    $result ?? [],
+                    'rating_prompt.scale.label_max',
+                    'Sangat membantu'
+                );
+
             @endphp
 
             {{-- Jumlah Hasilavigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
@@ -904,6 +1108,9 @@
                         <a href="#kategori" data-scroll-link class="nav-scroll-link whitespace-nowrap">Kategori</a>
                         <a href="#bmkg" data-scroll-link class="nav-scroll-link whitespace-nowrap">Cuaca Terkini</a>
                         <a href="#log" data-scroll-link class="nav-scroll-link whitespace-nowrap">Riwayat Terbaru</a>
+                        @if ($shouldAskSystemRating)
+                            <a href="#system-rating" data-scroll-link class="nav-scroll-link whitespace-nowrap">Rating Sistem</a>
+                        @endif
                     </nav>
                 </div>
             </header>
@@ -1373,6 +1580,60 @@
 
                             $bestRecommendation = $recommendations->first();
                         @endphp
+
+                        @if ($shouldAskSystemRating)
+                            <div
+                                id="system-rating"
+                                class="tourhub-system-rating-card section-anchor mb-6 p-5 md:p-6"
+                            >
+                                <div class="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                                    <div class="flex items-start gap-4">
+                                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-slate-950 text-2xl text-white shadow-lg shadow-slate-900/20">
+                                            ⭐
+                                        </div>
+
+                                        <div>
+                                            <p class="text-xs font-black tracking-wider text-blue-700 uppercase">
+                                                Rating Sistem TourHub
+                                            </p>
+                                            <h3 class="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                                                Nilai sistem rekomendasi TourHub
+                                            </h3>
+                                            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                                                Rating ini digunakan untuk menilai kualitas sistem rekomendasi TourHub, bukan untuk menilai tempat wisata tertentu.
+                                            </p>
+
+                                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-black">
+                                                <span class="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
+                                                    Konteks rekomendasi terakhir #{{ $systemRatingRecommendationLogId }}
+                                                </span>
+
+                                                <span class="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                                                    Belum pernah memberi rating sistem
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+                                        <button
+                                            type="button"
+                                            data-system-rating-open
+                                            class="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800"
+                                        >
+                                            Beri Rating Sistem
+                                        </button>
+                                        <button
+                                            type="button"
+                                            data-system-rating-dismiss
+                                            class="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                                        >
+                                            Nanti saja
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="premium-shadow overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
                             <div
@@ -2148,6 +2409,153 @@
                     </div>
                 </section>
             </main>
+
+            @if ($shouldAskSystemRating)
+                <div
+                    id="tourhub-system-rating-modal"
+                    class="tourhub-system-rating-modal"
+                    aria-hidden="true"
+                    data-open-on-load="1"
+                    data-rating-endpoint="{{ $systemRatingApiEndpoint }}"
+                    data-recommendation-log-id="{{ $systemRatingRecommendationLogId }}"
+                >
+                    <div class="tourhub-system-rating-backdrop" data-system-rating-close></div>
+
+                    <div
+                        class="tourhub-system-rating-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="tourhub-system-rating-title"
+                    >
+                        <div class="border-b border-slate-100 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-6 text-white">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-xs font-black tracking-wider text-blue-200 uppercase">
+                                        Rating Sistem TourHub
+                                    </p>
+                                    <h2 id="tourhub-system-rating-title" class="mt-2 text-2xl font-black tracking-tight">
+                                        {{ $systemRatingPromptTitle }}
+                                    </h2>
+                                    <p class="mt-2 text-sm leading-6 text-slate-300">
+                                        {{ $systemRatingPromptMessage }}
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    data-system-rating-close
+                                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl font-black text-white ring-1 ring-white/10 transition hover:bg-white/20"
+                                    aria-label="Tutup rating sistem"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="p-6">
+                            <form id="tourhub-system-rating-form" class="space-y-5">
+                                <input
+                                    type="hidden"
+                                    name="recommendation_log_id"
+                                    value="{{ $systemRatingRecommendationLogId }}"
+                                />
+
+                                <div>
+                                    <label class="block text-sm font-black text-slate-900">
+                                        Seberapa membantu sistem rekomendasi TourHub?
+                                    </label>
+
+                                    <div class="mt-4 flex items-center justify-between gap-2" data-system-rating-stars>
+                                        @for ($ratingValue = 1; $ratingValue <= 5; $ratingValue++)
+                                            <label class="block">
+                                                <input
+                                                    type="radio"
+                                                    name="rating"
+                                                    value="{{ $ratingValue }}"
+                                                    class="tourhub-system-rating-star-input sr-only"
+                                                    @checked($ratingValue === 5)
+                                                />
+                                                <span
+                                                    class="tourhub-system-rating-star-label"
+                                                    title="Rating {{ $ratingValue }} dari 5"
+                                                    aria-label="Rating {{ $ratingValue }} dari 5"
+                                                >
+                                                    ★
+                                                </span>
+                                            </label>
+                                        @endfor
+                                    </div>
+
+                                    <div class="mt-3 flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <span>{{ $systemRatingLabelMin }}</span>
+                                        <span>{{ $systemRatingLabelMax }}</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="system-rating-comment" class="block text-sm font-black text-slate-900">
+                                        Komentar tambahan
+                                    </label>
+                                    <textarea
+                                        id="system-rating-comment"
+                                        name="comment"
+                                        rows="4"
+                                        maxlength="1000"
+                                        placeholder="Contoh: hasil rekomendasinya sudah sesuai, tapi saya ingin pilihan yang lebih dekat dari lokasi saya."
+                                        class="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 placeholder:text-slate-400"
+                                    ></textarea>
+                                    <p class="mt-2 text-xs font-semibold text-slate-500">
+                                        Opsional. Komentar ini membantu mengevaluasi sistem rekomendasi TourHub.
+                                    </p>
+                                </div>
+
+                                <div
+                                    id="tourhub-system-rating-message"
+                                    class="hidden rounded-2xl border p-4 text-sm font-bold"
+                                ></div>
+
+                                <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+                                    <button
+                                        type="button"
+                                        data-system-rating-dismiss
+                                        class="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+                                    >
+                                        Nanti saja
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        id="tourhub-system-rating-submit"
+                                        class="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        Kirim Rating
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div id="tourhub-system-rating-success" class="hidden text-center">
+                                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">
+                                    ✓
+                                </div>
+                                <h3 class="mt-4 text-xl font-black text-slate-950">
+                                    Terima kasih!
+                                </h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">
+                                    Rating sistem berhasil disimpan. Masukan kamu membantu meningkatkan kualitas rekomendasi TourHub.
+                                </p>
+                                <button
+                                    type="button"
+                                    data-system-rating-close
+                                    class="mt-5 inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                                >
+                                    Selesai
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
         </div>
         <script>
             document.addEventListener('DOMContentLoaded', () => {
@@ -2156,6 +2564,213 @@
                 const sections = navLinks
                     .map((link) => document.querySelector(link.getAttribute('href')))
                     .filter(Boolean)
+
+                const ratingModal = document.getElementById('tourhub-system-rating-modal')
+                const ratingCard = document.getElementById('system-rating')
+                const ratingForm = document.getElementById('tourhub-system-rating-form')
+                const ratingSubmitButton = document.getElementById('tourhub-system-rating-submit')
+                const ratingMessage = document.getElementById('tourhub-system-rating-message')
+                const ratingSuccess = document.getElementById('tourhub-system-rating-success')
+                const ratingCsrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+
+                const openSystemRatingModal = () => {
+                    if (!ratingModal) {
+                        return
+                    }
+
+                    ratingModal.classList.add('is-open')
+                    ratingModal.setAttribute('aria-hidden', 'false')
+                    document.body.classList.add('tourhub-rating-lock')
+                }
+
+                const closeSystemRatingModal = () => {
+                    if (!ratingModal) {
+                        return
+                    }
+
+                    ratingModal.classList.remove('is-open')
+                    ratingModal.setAttribute('aria-hidden', 'true')
+                    document.body.classList.remove('tourhub-rating-lock')
+                }
+
+                const dismissSystemRatingModal = () => {
+                    if (ratingModal?.dataset?.recommendationLogId) {
+                        try {
+                            sessionStorage.setItem(`tourhub_system_rating_dismissed_${ratingModal.dataset.recommendationLogId}`, '1')
+                        } catch (error) {
+                            // Browser mungkin memblokir sessionStorage, jadi abaikan saja.
+                        }
+                    }
+
+                    closeSystemRatingModal()
+                }
+
+                const showRatingMessage = (type, message) => {
+                    if (!ratingMessage) {
+                        return
+                    }
+
+                    ratingMessage.classList.remove(
+                        'hidden',
+                        'border-red-200',
+                        'bg-red-50',
+                        'text-red-700',
+                        'border-emerald-200',
+                        'bg-emerald-50',
+                        'text-emerald-700'
+                    )
+
+                    if (type === 'success') {
+                        ratingMessage.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700')
+                    } else {
+                        ratingMessage.classList.add('border-red-200', 'bg-red-50', 'text-red-700')
+                    }
+
+                    ratingMessage.textContent = message
+                }
+
+                const refreshRatingStars = () => {
+                    if (!ratingForm) {
+                        return
+                    }
+
+                    const selectedValue = Number(new FormData(ratingForm).get('rating') || 0)
+
+                    ratingForm.querySelectorAll('.tourhub-system-rating-star-input').forEach((input) => {
+                        const label = input.nextElementSibling
+                        const inputValue = Number(input.value)
+
+                        if (label) {
+                            label.classList.toggle('is-active', inputValue <= selectedValue)
+                        }
+                    })
+                }
+
+                if (ratingModal) {
+                    document.querySelectorAll('[data-system-rating-open]').forEach((button) => {
+                        button.addEventListener('click', openSystemRatingModal)
+                    })
+
+                    document.querySelectorAll('[data-system-rating-close]').forEach((button) => {
+                        button.addEventListener('click', closeSystemRatingModal)
+                    })
+
+                    document.querySelectorAll('[data-system-rating-dismiss]').forEach((button) => {
+                        button.addEventListener('click', dismissSystemRatingModal)
+                    })
+
+                    ratingForm?.querySelectorAll('.tourhub-system-rating-star-input').forEach((input) => {
+                        input.addEventListener('change', refreshRatingStars)
+                    })
+
+                    refreshRatingStars()
+
+                    if (ratingModal.dataset.openOnLoad === '1') {
+                        let isDismissed = false
+
+                        try {
+                            isDismissed = sessionStorage.getItem(`tourhub_system_rating_dismissed_${ratingModal.dataset.recommendationLogId}`) === '1'
+                        } catch (error) {
+                            isDismissed = false
+                        }
+
+                        if (!isDismissed) {
+                            window.setTimeout(openSystemRatingModal, 520)
+                        }
+                    }
+
+                    document.addEventListener('keydown', (event) => {
+                        if (event.key === 'Escape' && ratingModal.classList.contains('is-open')) {
+                            closeSystemRatingModal()
+                        }
+                    })
+                }
+
+                ratingForm?.addEventListener('submit', async (event) => {
+                    event.preventDefault()
+
+                    const formData = new FormData(ratingForm)
+                    const ratingValue = Number(formData.get('rating') || 0)
+                    const recommendationLogId = Number(formData.get('recommendation_log_id') || ratingModal?.dataset?.recommendationLogId || 0)
+
+                    if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
+                        showRatingMessage('error', 'Silakan pilih rating 1 sampai 5 terlebih dahulu.')
+                        return
+                    }
+
+                    if (!recommendationLogId) {
+                        showRatingMessage('error', 'Riwayat rekomendasi tidak ditemukan. Silakan cari rekomendasi ulang.')
+                        return
+                    }
+
+                    const endpoint = ratingModal?.dataset?.ratingEndpoint || '/api/tourhub/system-ratings'
+                    const submitText = ratingSubmitButton?.textContent || 'Kirim Rating'
+
+                    if (ratingSubmitButton) {
+                        ratingSubmitButton.disabled = true
+                        ratingSubmitButton.textContent = 'Menyimpan...'
+                    }
+
+                    if (ratingMessage) {
+                        ratingMessage.classList.add('hidden')
+                        ratingMessage.textContent = ''
+                    }
+
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                ...(ratingCsrfToken ? { 'X-CSRF-TOKEN': ratingCsrfToken } : {}),
+                            },
+                            body: JSON.stringify({
+                                recommendation_log_id: recommendationLogId,
+                                rating: ratingValue,
+                                comment: String(formData.get('comment') || '').trim() || null,
+                                source: 'recommendation_page',
+                                platform: 'web',
+                                metadata: {
+                                    page: 'tourhub_recommendation_index',
+                                    user_agent: navigator.userAgent,
+                                },
+                            }),
+                        })
+
+                        const payload = await response.json().catch(() => ({}))
+
+                        if (!response.ok || payload.success === false) {
+                            const validationMessage = payload?.errors
+                                ? Object.values(payload.errors).flat().join(' ')
+                                : null
+
+                            throw new Error(validationMessage || payload.message || 'Rating sistem gagal disimpan.')
+                        }
+
+                        ratingForm.classList.add('hidden')
+                        ratingSuccess?.classList.remove('hidden')
+                        ratingCard?.remove()
+
+                        try {
+                            sessionStorage.removeItem(`tourhub_system_rating_dismissed_${recommendationLogId}`)
+                        } catch (error) {
+                            // Abaikan jika sessionStorage tidak tersedia.
+                        }
+                    } catch (error) {
+                        showRatingMessage(
+                            'error',
+                            error?.message || 'Rating sistem gagal disimpan. Pastikan kamu masih login dan coba lagi.'
+                        )
+                    } finally {
+                        if (ratingSubmitButton) {
+                            ratingSubmitButton.disabled = false
+                            ratingSubmitButton.textContent = submitText
+                        }
+                    }
+                })
+
 
                 document.querySelectorAll('[data-recommendation-reason-button]').forEach((button) => {
                     const reasonBox = button.closest('div')?.querySelector('[data-recommendation-reason-content]')

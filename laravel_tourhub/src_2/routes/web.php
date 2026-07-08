@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\User\ProfileController;
 use App\Http\Controllers\Web\WishlistController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\User\UserDashboardController;
 use App\Http\Controllers\Web\RecommendationController;
+use App\Http\Controllers\Web\SystemRatingController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -102,6 +104,29 @@ Route::middleware('auth')->group(function (): void {
 
     Route::patch('/user/profile', [ProfileController::class, 'update'])
         ->name('user.profile.patch');
+
+    /*
+    |--------------------------------------------------------------------------
+    | TourHub System Rating Routes
+    |--------------------------------------------------------------------------
+    |
+    | Route ini dipakai oleh form rating sistem pada halaman hasil rekomendasi,
+    | dashboard, dan detail riwayat rekomendasi.
+    |
+    | Catatan penting:
+    | - Rating ini menilai kualitas sistem rekomendasi TourHub.
+    | - Rating ini bukan rating destinasi/tempat wisata.
+    | - Semua route diproteksi auth agar rating selalu terkait user login.
+    |
+    */
+    Route::post('/system-ratings', [SystemRatingController::class, 'store'])
+        ->name('system-ratings.store');
+
+    Route::match(['put', 'patch'], '/system-ratings/{systemRating}', [SystemRatingController::class, 'update'])
+        ->name('system-ratings.update');
+
+    Route::delete('/system-ratings/{systemRating}', [SystemRatingController::class, 'destroy'])
+        ->name('system-ratings.destroy');
 
     /*
     |--------------------------------------------------------------------------

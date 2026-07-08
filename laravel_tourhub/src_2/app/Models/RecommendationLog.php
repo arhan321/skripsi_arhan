@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class RecommendationLog extends Model
 {
@@ -37,6 +38,11 @@ final class RecommendationLog extends Model
     public function wishlists(): HasMany
     {
         return $this->hasMany(Wishlist::class);
+    }
+
+    public function systemRating(): HasOne
+    {
+        return $this->hasOne(SystemRating::class);
     }
 
     public function getTopDestinationNameAttribute(): ?string

@@ -360,6 +360,85 @@
         return isset($wishlistDestinationKeys[$makeWishlistDestinationKey($item)]);
     };
 
+    /*
+     |--------------------------------------------------------------------------
+     | Rating Sistem TourHub pada Detail Riwayat
+     |--------------------------------------------------------------------------
+     | Fitur ini hanya menambahkan form penilaian kualitas sistem rekomendasi.
+     | Catatan penting:
+     | - Ini bukan rating tempat wisata.
+     | - Fitur lama di halaman history tetap dipertahankan.
+     | - Query dibuat defensif agar halaman tidak langsung error jika migration
+     |   atau route rating belum dipasang.
+     */
+    $systemRatingRouteAvailable = \Illuminate\Support\Facades\Route::has('system-ratings.store');
+    $systemRatingDestroyRouteAvailable = \Illuminate\Support\Facades\Route::has('system-ratings.destroy');
+
+    $systemRatingTableAvailable = false;
+
+    try {
+        $systemRatingTableAvailable = class_exists(\App\Models\SystemRating::class)
+            && \Illuminate\Support\Facades\Schema::hasTable('system_ratings');
+    } catch (\Throwable $exception) {
+        $systemRatingTableAvailable = false;
+    }
+
+    $existingSystemRating = null;
+
+    if (
+        $currentUserId > 0
+        && $systemRatingTableAvailable
+        && class_exists(\App\Models\SystemRating::class)
+    ) {
+        try {
+            $existingSystemRating = \App\Models\SystemRating::query()
+                ->where('user_id', $currentUserId)
+                ->latest('rated_at')
+                ->first();
+        } catch (\Throwable $exception) {
+            $existingSystemRating = null;
+        }
+    }
+
+    $selectedSystemRating = (int) old('rating', (int) ($existingSystemRating?->rating ?? 0));
+    $systemRatingComment = old('comment', (string) ($existingSystemRating?->comment ?? ''));
+
+    $systemRatingLabel = function (int $rating): string {
+        return match ($rating) {
+            1 => 'Kurang membantu',
+            2 => 'Cukup kurang',
+            3 => 'Cukup membantu',
+            4 => 'Membantu',
+            5 => 'Sangat membantu',
+            default => 'Belum diberi rating',
+        };
+    };
+
+    $systemRatingDescription = function (int $rating): string {
+        return match ($rating) {
+            1 => 'Hasil rekomendasi belum sesuai dengan kebutuhanmu.',
+            2 => 'Hasil rekomendasi masih perlu banyak diperbaiki.',
+            3 => 'Hasil rekomendasi cukup membantu, tetapi masih bisa ditingkatkan.',
+            4 => 'Hasil rekomendasi sudah membantu memilih destinasi wisata.',
+            5 => 'Hasil rekomendasi sangat membantu dan sesuai dengan preferensimu.',
+            default => 'Berikan penilaian setelah kamu melihat hasil rekomendasi pada riwayat ini.',
+        };
+    };
+
+    $systemRatingEmoji = function (int $rating): string {
+        return match ($rating) {
+            1 => '😕',
+            2 => '🙂',
+            3 => '😊',
+            4 => '🤩',
+            5 => '🏆',
+            default => '⭐',
+        };
+    };
+
+    $systemRatingProgress = min(100, max(0, $selectedSystemRating * 20));
+
+
 @endphp
 
 
@@ -525,6 +604,460 @@
             transition: none !important;
         }
     }
+
+    /*
+     * Tambahan khusus Rating Sistem TourHub.
+     * Scope class diawali history-system-rating agar tidak mengganggu fitur lama.
+     * Bagian ini dibuat lebih ekspresif karena rating sistem adalah feedback utama user.
+     */
+    .history-system-rating-shell {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+        background:
+            radial-gradient(circle at 12% 8%, rgba(250, 204, 21, 0.26), transparent 30%),
+            radial-gradient(circle at 92% 18%, rgba(59, 130, 246, 0.18), transparent 30%),
+            radial-gradient(circle at 50% 110%, rgba(245, 158, 11, 0.18), transparent 32%),
+            rgb(255, 255, 255);
+    }
+
+    .history-system-rating-shell::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        z-index: -2;
+        background:
+            linear-gradient(120deg, rgba(245, 158, 11, 0.60), rgba(59, 130, 246, 0.30), rgba(251, 191, 36, 0.50));
+        opacity: 0.50;
+    }
+
+    .history-system-rating-shell::after {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        z-index: -1;
+        border-radius: 1.9rem;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+    }
+
+    .history-system-rating-note {
+        position: relative;
+        overflow: hidden;
+        background-image:
+            radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 34%),
+            radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.22), transparent 34%),
+            linear-gradient(135deg, rgba(255, 251, 235, 0.92), rgba(239, 246, 255, 0.88));
+    }
+
+    .history-system-rating-note::before {
+        content: '★ ★ ★';
+        position: absolute;
+        right: 1.5rem;
+        top: -1rem;
+        color: rgba(245, 158, 11, 0.12);
+        font-size: 5rem;
+        font-weight: 900;
+        letter-spacing: 0.35rem;
+        transform: rotate(-10deg);
+        pointer-events: none;
+    }
+
+    .history-system-rating-status-card {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .history-system-rating-status-card::before {
+        content: '';
+        position: absolute;
+        inset: auto -25% -45% -25%;
+        height: 5rem;
+        background: radial-gradient(circle, rgba(245, 158, 11, 0.20), transparent 68%);
+        pointer-events: none;
+    }
+
+    .history-system-rating-form-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.5rem;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.86)),
+            radial-gradient(circle at top right, rgba(250, 204, 21, 0.14), transparent 34%);
+        box-shadow:
+            0 20px 45px rgba(15, 23, 42, 0.08),
+            inset 0 0 0 1px rgba(226, 232, 240, 0.90);
+    }
+
+    .history-system-rating-group {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0.7rem;
+    }
+
+    .history-system-rating-star {
+        --star-bg: rgba(255, 255, 255, 0.96);
+        --star-border: rgb(226, 232, 240);
+        --star-text: rgb(148, 163, 184);
+        --star-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+        position: relative;
+        min-height: 6.3rem;
+        transform-style: preserve-3d;
+        border-color: var(--star-border);
+        background:
+            radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.90), transparent 28%),
+            var(--star-bg);
+        color: var(--star-text);
+        box-shadow: var(--star-shadow);
+        user-select: none;
+        transition:
+            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+            background-color 220ms ease,
+            color 220ms ease,
+            box-shadow 220ms ease,
+            border-color 220ms ease,
+            filter 220ms ease;
+    }
+
+    .history-system-rating-star::before {
+        content: '';
+        position: absolute;
+        inset: 0.25rem;
+        border-radius: 1.1rem;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.70), transparent 42%),
+            radial-gradient(circle at 50% 100%, rgba(250, 204, 21, 0.0), transparent 52%);
+        opacity: 0;
+        transition: opacity 220ms ease;
+        pointer-events: none;
+    }
+
+    .history-system-rating-star::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 9999px;
+        background: rgba(250, 204, 21, 0.55);
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.4);
+        box-shadow:
+            0 -2.35rem 0 rgba(250, 204, 21, 0.38),
+            1.75rem -1.55rem 0 rgba(251, 191, 36, 0.30),
+            2.2rem 0.25rem 0 rgba(245, 158, 11, 0.24),
+            1.0rem 2.0rem 0 rgba(251, 191, 36, 0.25),
+            -1.0rem 2.0rem 0 rgba(250, 204, 21, 0.25),
+            -2.2rem 0.25rem 0 rgba(245, 158, 11, 0.24),
+            -1.75rem -1.55rem 0 rgba(251, 191, 36, 0.30);
+        pointer-events: none;
+    }
+
+    .history-system-rating-star:hover,
+    .history-system-rating-star.is-preview,
+    .history-system-rating-star.is-active {
+        --star-bg: rgb(255, 251, 235);
+        --star-border: rgb(245, 158, 11);
+        --star-text: rgb(15, 23, 42);
+        --star-shadow: 0 18px 38px rgba(245, 158, 11, 0.20);
+        transform: translateY(-5px) scale(1.035);
+        filter: saturate(1.08);
+    }
+
+    .history-system-rating-star.is-active {
+        background:
+            radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.92), transparent 24%),
+            linear-gradient(180deg, rgb(254, 240, 138), rgb(251, 191, 36));
+        animation: historyRatingPop 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .history-system-rating-star.is-preview:not(.is-active) {
+        background:
+            radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.92), transparent 24%),
+            linear-gradient(180deg, rgb(254, 249, 195), rgb(253, 230, 138));
+    }
+
+    .history-system-rating-star.is-just-selected {
+        animation: historyRatingBounce 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .history-system-rating-star.is-just-selected::after {
+        animation: historyRatingSpark 680ms ease-out;
+    }
+
+    .history-system-rating-star:hover::before,
+    .history-system-rating-star.is-preview::before,
+    .history-system-rating-star.is-active::before {
+        opacity: 1;
+    }
+
+    .history-system-rating-star:has(input:focus-visible) {
+        outline: 4px solid rgba(59, 130, 246, 0.20);
+        outline-offset: 4px;
+    }
+
+    .history-system-rating-star-visual {
+        position: relative;
+        z-index: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.8rem;
+        height: 2.8rem;
+        border-radius: 9999px;
+        font-size: 2rem;
+        line-height: 1;
+        text-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.65),
+            0 8px 16px rgba(245, 158, 11, 0.15);
+        transform: translateZ(14px);
+        transition:
+            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+            text-shadow 220ms ease;
+    }
+
+    .history-system-rating-star:hover .history-system-rating-star-visual,
+    .history-system-rating-star.is-preview .history-system-rating-star-visual,
+    .history-system-rating-star.is-active .history-system-rating-star-visual {
+        transform: translateZ(20px) rotate(-5deg) scale(1.14);
+        text-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.72),
+            0 12px 22px rgba(146, 64, 14, 0.20);
+    }
+
+    .history-system-rating-star-score {
+        position: relative;
+        z-index: 1;
+        margin-top: 0.35rem;
+        font-size: 0.78rem;
+        font-weight: 950;
+        letter-spacing: 0.04em;
+    }
+
+    .history-system-rating-star-caption {
+        position: relative;
+        z-index: 1;
+        margin-top: 0.22rem;
+        max-width: 5.4rem;
+        font-size: 0.66rem;
+        font-weight: 850;
+        line-height: 0.92rem;
+        color: currentColor;
+        opacity: 0.78;
+    }
+
+    .history-system-rating-live-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.35rem;
+        background:
+            linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.94)),
+            radial-gradient(circle at top right, rgba(250, 204, 21, 0.22), transparent 36%);
+        color: white;
+        box-shadow: 0 22px 42px rgba(15, 23, 42, 0.18);
+    }
+
+    .history-system-rating-live-card::before {
+        content: '';
+        position: absolute;
+        inset: -35%;
+        background:
+            conic-gradient(from 180deg, transparent, rgba(250, 204, 21, 0.18), transparent, rgba(59, 130, 246, 0.14), transparent);
+        animation: historyRatingRotate 9s linear infinite;
+        opacity: 0.75;
+        pointer-events: none;
+    }
+
+    .history-system-rating-live-card > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .history-system-rating-emoji {
+        display: flex;
+        width: 3.7rem;
+        height: 3.7rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1.25rem;
+        background: rgba(255, 255, 255, 0.12);
+        font-size: 2rem;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+        transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .history-system-rating-live-card.is-updated .history-system-rating-emoji {
+        animation: historyRatingWiggle 560ms ease;
+    }
+
+    .history-system-rating-meter {
+        position: relative;
+        height: 0.85rem;
+        overflow: hidden;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+    }
+
+    .history-system-rating-meter-fill {
+        display: block;
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background:
+            linear-gradient(90deg, rgb(251, 191, 36), rgb(245, 158, 11), rgb(250, 204, 21));
+        box-shadow:
+            0 0 18px rgba(250, 204, 21, 0.55),
+            inset 0 1px 0 rgba(255, 255, 255, 0.45);
+        transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .history-system-rating-submit {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .history-system-rating-submit::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+        transform: translateX(-120%);
+        transition: transform 620ms ease;
+    }
+
+    .history-system-rating-submit:hover::after {
+        transform: translateX(120%);
+    }
+
+    .history-system-rating-side-card {
+        position: relative;
+        overflow: hidden;
+        background:
+            linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.96)),
+            radial-gradient(circle at top right, rgba(59, 130, 246, 0.14), transparent 34%);
+    }
+
+    .history-system-rating-error-shake {
+        animation: historyRatingShake 420ms ease;
+    }
+
+    @keyframes historyRatingPop {
+        0% {
+            transform: translateY(0) scale(0.96);
+        }
+        55% {
+            transform: translateY(-7px) scale(1.08);
+        }
+        100% {
+            transform: translateY(-5px) scale(1.035);
+        }
+    }
+
+    @keyframes historyRatingBounce {
+        0% {
+            transform: translateY(-5px) scale(1.02) rotate(0deg);
+        }
+        35% {
+            transform: translateY(-9px) scale(1.10) rotate(-3deg);
+        }
+        70% {
+            transform: translateY(-4px) scale(1.03) rotate(2deg);
+        }
+        100% {
+            transform: translateY(-5px) scale(1.035) rotate(0deg);
+        }
+    }
+
+    @keyframes historyRatingSpark {
+        0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.15);
+        }
+        25% {
+            opacity: 1;
+        }
+        100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.85);
+        }
+    }
+
+    @keyframes historyRatingRotate {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes historyRatingWiggle {
+        0%, 100% {
+            transform: rotate(0deg) scale(1);
+        }
+        30% {
+            transform: rotate(-8deg) scale(1.08);
+        }
+        65% {
+            transform: rotate(6deg) scale(1.04);
+        }
+    }
+
+    @keyframes historyRatingShake {
+        0%, 100% {
+            transform: translateX(0);
+        }
+        20% {
+            transform: translateX(-7px);
+        }
+        40% {
+            transform: translateX(7px);
+        }
+        60% {
+            transform: translateX(-5px);
+        }
+        80% {
+            transform: translateX(5px);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .history-system-rating-group {
+            gap: 0.45rem;
+        }
+
+        .history-system-rating-star {
+            min-height: 5.55rem;
+            border-radius: 1rem;
+            padding-left: 0.35rem;
+            padding-right: 0.35rem;
+        }
+
+        .history-system-rating-star-visual {
+            width: 2.35rem;
+            height: 2.35rem;
+            font-size: 1.65rem;
+        }
+
+        .history-system-rating-star-caption {
+            display: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .history-system-rating-star,
+        .history-system-rating-star::before,
+        .history-system-rating-star::after,
+        .history-system-rating-star-visual,
+        .history-system-rating-meter-fill,
+        .history-system-rating-live-card::before,
+        .history-system-rating-submit::after,
+        .history-system-rating-emoji {
+            animation: none !important;
+            transition: none !important;
+        }
+    }
+
 </style>
 
 <x-layouts.tourhub-auth title="Detail Riwayat - TourHub Bali">
@@ -688,6 +1221,233 @@
             </div>
         </div>
     </section>
+
+
+    @if ($log->status === 'success' && ! $existingSystemRating)
+        {{-- Rating Sistem TourHub --}}
+        <section id="rating-system" class="history-system-rating-shell mt-6 history-premium-shadow rounded-[2rem] border border-amber-200">
+            <div class="history-system-rating-note border-b border-amber-100 p-6">
+                <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-3xl">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-xs font-black text-amber-700 ring-1 ring-amber-200">
+                            <span>⭐</span>
+                            Rating Sistem TourHub
+                        </span>
+
+                        <h2 class="mt-4 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+                            {{ $existingSystemRating ? 'Rating sistem sudah kamu kirim' : 'Bantu nilai sistem rekomendasi TourHub' }}
+                        </h2>
+
+                        <p class="mt-2 text-sm leading-6 text-slate-600">
+                            Rating ini cukup diberikan satu kali untuk menilai kualitas sistem rekomendasi TourHub secara keseluruhan, bukan untuk menilai destinasi wisata.
+                            Masukanmu membantu evaluasi sistem pada penelitian skripsi ini.
+                        </p>
+
+                        <div class="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                            <span class="rounded-full bg-white/80 px-3 py-1.5 text-slate-700 ring-1 ring-amber-100">
+                                Bintang 1 = kurang membantu
+                            </span>
+                            <span class="rounded-full bg-white/80 px-3 py-1.5 text-slate-700 ring-1 ring-amber-100">
+                                Bintang 5 = sangat membantu
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="history-system-rating-status-card rounded-3xl bg-white px-5 py-4 text-center shadow-sm ring-1 ring-amber-200">
+                        <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Status Rating</p>
+
+                        @if ($existingSystemRating)
+                            <p class="mt-1 text-3xl font-black text-amber-500">
+                                {{ $existingSystemRating->rating }}/5
+                            </p>
+                            <p class="mt-1 text-xs font-black text-amber-700">
+                                {{ $systemRatingLabel((int) $existingSystemRating->rating) }}
+                            </p>
+                        @else
+                            <p class="mt-1 text-3xl font-black text-slate-950">Belum</p>
+                            <p class="mt-1 text-xs font-black text-slate-500">Belum diberi rating</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6">
+                @if (session('success'))
+                    <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                @if (session('error'))
+                    <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-700">
+                        {{ session('error') }}
+                    </div>
+                @endif
+
+                @if (! $systemRatingRouteAvailable)
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+                        <p class="font-black">Route rating belum tersedia.</p>
+                        <p class="mt-1">
+                            Tambahkan route web <span class="font-black">system-ratings.store</span> terlebih dahulu agar form rating bisa digunakan.
+                        </p>
+                    </div>
+                @elseif (! $systemRatingTableAvailable)
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+                        <p class="font-black">Tabel rating belum tersedia.</p>
+                        <p class="mt-1">
+                            Jalankan migration <span class="font-black">system_ratings</span> terlebih dahulu agar user bisa menyimpan rating sistem.
+                        </p>
+                    </div>
+                @else
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                        <div class="lg:col-span-8">
+                            <form method="POST" action="{{ route('system-ratings.store') }}" class="history-system-rating-form-card space-y-5 p-5 md:p-6" data-system-rating-form>
+                                @csrf
+
+                                <input type="hidden" name="recommendation_log_id" value="{{ $log->id }}">
+                                <input type="hidden" name="source" value="history_detail_page">
+                                <input type="hidden" name="platform" value="web">
+
+                                <div>
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                        <div>
+                                            <label class="block text-sm font-black text-slate-800">
+                                                Seberapa membantu sistem rekomendasi TourHub?
+                                            </label>
+                                            <p class="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                                                Klik bintang dari kiri ke kanan. Sistem akan membaca rating 1 sampai 5 secara otomatis.
+                                            </p>
+                                        </div>
+
+                                        <span class="inline-flex w-max items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700 ring-1 ring-amber-100">
+                                            <span data-system-rating-mini-score>{{ $selectedSystemRating > 0 ? $selectedSystemRating . '/5' : 'Pilih rating' }}</span>
+                                        </span>
+                                    </div>
+
+                                    <div class="history-system-rating-group mt-4" data-system-rating-group>
+                                        @for ($ratingValue = 1; $ratingValue <= 5; $ratingValue++)
+                                            <label
+                                                class="history-system-rating-star {{ $selectedSystemRating >= $ratingValue ? 'is-active' : '' }} flex cursor-pointer flex-col items-center justify-center rounded-2xl border px-2 py-3 text-center"
+                                                data-system-rating-star
+                                                data-rating-value="{{ $ratingValue }}"
+                                                data-rating-label="{{ $systemRatingLabel($ratingValue) }}"
+                                                data-rating-description="{{ $systemRatingDescription($ratingValue) }}"
+                                                data-rating-emoji="{{ $systemRatingEmoji($ratingValue) }}"
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="rating"
+                                                    value="{{ $ratingValue }}"
+                                                    class="sr-only"
+                                                    @checked($selectedSystemRating === $ratingValue)
+                                                >
+
+                                                <span class="history-system-rating-star-visual">★</span>
+                                                <span class="history-system-rating-star-score">{{ $ratingValue }}/5</span>
+                                                <span class="history-system-rating-star-caption">{{ $systemRatingLabel($ratingValue) }}</span>
+                                            </label>
+                                        @endfor
+                                    </div>
+
+                                    <div class="history-system-rating-live-card mt-4 p-4" data-system-rating-live-card>
+                                        <div class="flex items-start gap-4">
+                                            <span class="history-system-rating-emoji shrink-0" data-system-rating-emoji>
+                                                {{ $systemRatingEmoji($selectedSystemRating) }}
+                                            </span>
+
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-sm font-black text-white" data-system-rating-label>
+                                                    {{ $systemRatingLabel($selectedSystemRating) }}
+                                                </p>
+
+                                                <p class="mt-1 text-xs leading-5 text-white/70" data-system-rating-description>
+                                                    {{ $systemRatingDescription($selectedSystemRating) }}
+                                                </p>
+
+                                                <div class="mt-3 history-system-rating-meter">
+                                                    <span
+                                                        class="history-system-rating-meter-fill"
+                                                        data-system-rating-progress
+                                                        style="width: {{ $systemRatingProgress }}%"
+                                                    ></span>
+                                                </div>
+
+                                                <div class="mt-2 flex justify-between text-[10px] font-black uppercase tracking-wide text-white/45">
+                                                    <span>1 Bintang</span>
+                                                    <span>5 Bintang</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @error('rating')
+                                        <p class="mt-2 text-sm font-bold text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
+                                    <label for="system_rating_comment" class="block text-sm font-black text-slate-800">
+                                        Komentar atau masukan
+                                        <span class="font-semibold text-slate-400">(opsional)</span>
+                                    </label>
+
+                                    <textarea
+                                        id="system_rating_comment"
+                                        name="comment"
+                                        rows="4"
+                                        maxlength="1000"
+                                        placeholder="Contoh: rekomendasinya sudah sesuai, tapi saya ingin hasil yang lebih dekat dengan lokasi saya."
+                                        class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10"
+                                    >{{ $systemRatingComment }}</textarea>
+
+                                    @error('comment')
+                                        <p class="mt-2 text-sm font-bold text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                    <button
+                                        type="submit"
+                                        class="history-system-rating-submit inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-slate-800 sm:w-auto"
+                                    >
+                                        <span class="relative z-10">Kirim Rating Sistem</span>
+                                    </button>
+
+                                    <a
+                                        href="#hasil-rekomendasi-history"
+                                        class="inline-flex w-full items-center justify-center rounded-2xl bg-blue-50 px-5 py-3 text-sm font-black text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100 sm:w-auto"
+                                    >
+                                        Lihat Lagi Rekomendasi
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+
+                        <aside class="lg:col-span-4">
+                            <div class="history-system-rating-side-card rounded-3xl border border-slate-200 p-5">
+                                <p class="text-sm font-black text-slate-950">Kenapa rating ini penting?</p>
+
+                                <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                                    <li class="flex gap-2"><span class="mt-0.5">✅</span><span>Membantu mengevaluasi apakah sistem rekomendasi sudah sesuai preferensi user.</span></li>
+                                    <li class="flex gap-2"><span class="mt-0.5">📊</span><span>Bisa menjadi data pendukung pengujian kualitas sistem pada skripsi.</span></li>
+                                    <li class="flex gap-2"><span class="mt-0.5">🧭</span><span>Membedakan rating sistem dari rating asli tempat wisata.</span></li>
+                                </ul>
+
+                                <div class="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                                    <p class="text-xs font-black tracking-wide text-blue-700 uppercase">Cara membaca rating</p>
+                                    <div class="mt-3 space-y-2 text-xs font-semibold leading-5 text-blue-900">
+                                        <p>⭐ 1 bintang: sistem kurang membantu.</p>
+                                        <p>⭐⭐⭐ 3 bintang: cukup membantu.</p>
+                                        <p>⭐⭐⭐⭐⭐ 5 bintang: sangat membantu.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                @endif
+            </div>
+        </section>
+    @endif
 
     @if ($log->status === 'failed')
         <section class="mt-6 rounded-[1.8rem] border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
@@ -861,7 +1621,7 @@
         </section>
 
         {{-- Daftar Rekomendasi --}}
-        <section class="mt-6 history-premium-shadow rounded-[2rem] border border-slate-200 bg-white p-6">
+        <section id="hasil-rekomendasi-history" class="mt-6 history-premium-shadow rounded-[2rem] border border-slate-200 bg-white p-6">
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                     <p class="text-sm font-semibold text-slate-500">Daftar Rekomendasi</p>
@@ -1041,6 +1801,123 @@
         </section>
     @endif
 
+
+
+    @if ($log->status === 'success' && $existingSystemRating)
+        {{-- Rating Sistem TourHub - diletakkan paling bawah jika user sudah pernah rating --}}
+        <section id="rating-system" class="history-system-rating-shell mt-6 history-premium-shadow rounded-[2rem] border border-amber-200">
+            <div class="history-system-rating-note border-b border-amber-100 p-6">
+                <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-3xl">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">
+                            <span>💚</span>
+                            Rating Sistem TourHub
+                        </span>
+
+                        <h2 class="mt-4 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+                            Terima kasih sudah menilai sistem TourHub
+                        </h2>
+
+                        <p class="mt-2 text-sm leading-6 text-slate-600">
+                            Rating kamu sudah tersimpan sebagai penilaian kualitas sistem rekomendasi TourHub secara keseluruhan.
+                            Karena konsepnya satu user cukup memberi satu rating, form permintaan rating tidak akan muncul lagi.
+                        </p>
+
+                        <div class="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                            <span class="rounded-full bg-white/80 px-3 py-1.5 text-slate-700 ring-1 ring-emerald-100">
+                                Diberikan pada {{ $existingSystemRating->rated_at?->format('d M Y H:i') ?? $existingSystemRating->updated_at?->format('d M Y H:i') }}
+                            </span>
+                            <span class="rounded-full bg-white/80 px-3 py-1.5 text-slate-700 ring-1 ring-emerald-100">
+                                {{ $systemRatingLabel((int) $existingSystemRating->rating) }}
+                            </span>
+                            @if ($existingSystemRating->recommendation_log_id)
+                                <span class="rounded-full bg-white/80 px-3 py-1.5 text-slate-700 ring-1 ring-emerald-100">
+                                    Konteks riwayat #{{ $existingSystemRating->recommendation_log_id }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="history-system-rating-status-card rounded-3xl bg-white px-6 py-5 text-center shadow-sm ring-1 ring-emerald-200">
+                        <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Rating Kamu</p>
+                        <p class="mt-1 text-4xl font-black text-emerald-600">
+                            {{ $existingSystemRating->rating }}/5
+                        </p>
+                        <p class="mt-1 text-xl leading-none text-amber-400">
+                            @for ($starIndex = 1; $starIndex <= 5; $starIndex++)
+                                {{ $starIndex <= (int) $existingSystemRating->rating ? '★' : '☆' }}
+                            @endfor
+                        </p>
+                        <p class="mt-2 text-xs font-black text-emerald-700">
+                            {{ $systemRatingLabel((int) $existingSystemRating->rating) }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    <div class="history-system-rating-form-card p-5 md:p-6 lg:col-span-8">
+                        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div class="flex items-start gap-4">
+                                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-2xl text-emerald-600 ring-1 ring-emerald-200">
+                                    ✅
+                                </div>
+
+                                <div>
+                                    <p class="text-sm font-black text-slate-950">
+                                        Penilaianmu membantu evaluasi sistem rekomendasi.
+                                    </p>
+                                    <p class="mt-2 text-sm leading-6 text-slate-600">
+                                        Masukan ini bisa dipakai sebagai data pendukung untuk melihat apakah sistem rekomendasi TourHub sudah membantu user dalam memilih destinasi wisata Bali.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-3xl bg-emerald-50 px-5 py-4 text-center ring-1 ring-emerald-200">
+                                <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Status</p>
+                                <p class="mt-1 text-sm font-black leading-5 text-emerald-700">
+                                    Sudah<br>memberi<br>rating
+                                </p>
+                            </div>
+                        </div>
+
+                        @if ($existingSystemRating->comment)
+                            <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black tracking-wide text-slate-500 uppercase">Komentar dari kamu</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-700">“{{ $existingSystemRating->comment }}”</p>
+                            </div>
+                        @else
+                            <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black tracking-wide text-slate-500 uppercase">Komentar dari kamu</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-500">Tidak ada komentar tambahan.</p>
+                            </div>
+                        @endif
+                    </div>
+
+                    <aside class="lg:col-span-4">
+                        <div class="history-system-rating-side-card rounded-3xl border border-slate-200 p-5">
+                            <p class="text-sm font-black text-slate-950">Ringkasan rating sistem</p>
+
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-white/80 p-4">
+                                <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Nilai</p>
+                                <p class="mt-2 text-xl font-black text-slate-950">
+                                    {{ $existingSystemRating->rating }}/5 - {{ $systemRatingLabel((int) $existingSystemRating->rating) }}
+                                </p>
+                            </div>
+
+                            <div class="mt-3 rounded-2xl border border-slate-200 bg-white/80 p-4">
+                                <p class="text-xs font-bold tracking-wide text-slate-500 uppercase">Makna Rating</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">
+                                    {{ $systemRatingDescription((int) $existingSystemRating->rating) }}
+                                </p>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </section>
+    @endif
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('[data-card-reason-button]').forEach((button) => {
@@ -1086,4 +1963,167 @@
             })
         })
     </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const emptyRatingState = {
+                label: 'Belum diberi rating',
+                description: 'Berikan penilaian setelah kamu melihat hasil rekomendasi pada riwayat ini.',
+                emoji: '⭐',
+            }
+
+            document.querySelectorAll('[data-system-rating-form]').forEach((form) => {
+                const group = form.querySelector('[data-system-rating-group]')
+                const stars = group ? Array.from(group.querySelectorAll('[data-system-rating-star]')) : []
+                const labelTarget = form.querySelector('[data-system-rating-label]')
+                const descriptionTarget = form.querySelector('[data-system-rating-description]')
+                const emojiTarget = form.querySelector('[data-system-rating-emoji]')
+                const progressTarget = form.querySelector('[data-system-rating-progress]')
+                const miniScoreTarget = form.querySelector('[data-system-rating-mini-score]')
+                const liveCard = form.querySelector('[data-system-rating-live-card]')
+
+                let selectedValue = Number(form.querySelector('input[name="rating"]:checked')?.value || 0)
+                let previewValue = 0
+
+                const getStarMeta = (value) => {
+                    const star = stars.find((item) => Number(item.dataset.ratingValue || 0) === Number(value))
+
+                    if (!star) {
+                        return emptyRatingState
+                    }
+
+                    return {
+                        label: star.dataset.ratingLabel || emptyRatingState.label,
+                        description: star.dataset.ratingDescription || emptyRatingState.description,
+                        emoji: star.dataset.ratingEmoji || emptyRatingState.emoji,
+                    }
+                }
+
+                const animateLiveCard = () => {
+                    if (!liveCard) {
+                        return
+                    }
+
+                    liveCard.classList.remove('is-updated')
+                    void liveCard.offsetWidth
+                    liveCard.classList.add('is-updated')
+                }
+
+                const paintStars = (value, mode = 'selected') => {
+                    stars.forEach((star) => {
+                        const starValue = Number(star.dataset.ratingValue || 0)
+                        const isFilled = starValue <= value
+
+                        star.classList.toggle('is-active', isFilled && mode === 'selected')
+                        star.classList.toggle('is-preview', isFilled && mode === 'preview')
+                    })
+                }
+
+                const syncDisplay = (value, mode = 'selected') => {
+                    const meta = Number(value) > 0 ? getStarMeta(value) : emptyRatingState
+                    const progress = Math.max(0, Math.min(100, Number(value || 0) * 20))
+
+                    if (labelTarget) {
+                        labelTarget.textContent = meta.label
+                    }
+
+                    if (descriptionTarget) {
+                        descriptionTarget.textContent = meta.description
+                    }
+
+                    if (emojiTarget) {
+                        emojiTarget.textContent = meta.emoji
+                    }
+
+                    if (progressTarget) {
+                        progressTarget.style.width = `${progress}%`
+                    }
+
+                    if (miniScoreTarget) {
+                        miniScoreTarget.textContent = Number(value) > 0 ? `${value}/5` : 'Pilih rating'
+                    }
+
+                    paintStars(value, mode)
+                }
+
+                const selectRating = (value, sourceStar = null) => {
+                    selectedValue = Number(value || 0)
+                    previewValue = 0
+
+                    const input = form.querySelector(`input[name="rating"][value="${selectedValue}"]`)
+
+                    if (input) {
+                        input.checked = true
+                    }
+
+                    stars.forEach((star) => {
+                        star.classList.remove('is-just-selected')
+                    })
+
+                    if (sourceStar) {
+                        sourceStar.classList.add('is-just-selected')
+                        window.setTimeout(() => {
+                            sourceStar.classList.remove('is-just-selected')
+                        }, 620)
+                    }
+
+                    syncDisplay(selectedValue, 'selected')
+                    animateLiveCard()
+                }
+
+                stars.forEach((star) => {
+                    const input = star.querySelector('input[type="radio"]')
+                    const value = Number(star.dataset.ratingValue || 0)
+
+                    star.addEventListener('mouseenter', () => {
+                        previewValue = value
+                        syncDisplay(previewValue, 'preview')
+                    })
+
+                    star.addEventListener('mouseleave', () => {
+                        previewValue = 0
+                        syncDisplay(selectedValue, 'selected')
+                    })
+
+                    star.addEventListener('click', () => {
+                        selectRating(value, star)
+                    })
+
+                    star.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            selectRating(value, star)
+                        }
+                    })
+
+                    input?.addEventListener('change', () => {
+                        selectRating(value, star)
+                    })
+                })
+
+                form.addEventListener('submit', (event) => {
+                    const checkedInput = form.querySelector('input[name="rating"]:checked')
+
+                    if (!checkedInput) {
+                        event.preventDefault()
+
+                        group?.classList.remove('history-system-rating-error-shake')
+                        void group?.offsetWidth
+                        group?.classList.add('history-system-rating-error-shake')
+
+                        syncDisplay(0, 'selected')
+
+                        if (descriptionTarget) {
+                            descriptionTarget.textContent = 'Pilih minimal 1 bintang terlebih dahulu sebelum mengirim rating sistem.'
+                        }
+
+                        stars[0]?.focus?.()
+                    }
+                })
+
+                syncDisplay(selectedValue, 'selected')
+            })
+        })
+    </script>
+
 </x-layouts.tourhub-auth>

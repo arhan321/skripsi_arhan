@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\InternalTouristDestinationController;
 use App\Http\Controllers\Api\RecommendationHistoryController;
 use App\Http\Controllers\Api\RecommendationProxyController;
+use App\Http\Controllers\Api\SystemRatingController;
 use App\Http\Controllers\Api\TourHubLocationController;
 use App\Http\Controllers\Api\WishlistController as ApiWishlistController;
 use Illuminate\Support\Facades\Route;
@@ -22,10 +23,19 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
     Route::get('/tourhub/locations', TourHubLocationController::class);
+
     Route::post('/tourhub/recommend', RecommendationProxyController::class);
 
     Route::get('/tourhub/history', [RecommendationHistoryController::class, 'index']);
     Route::get('/tourhub/history/{recommendationLog}', [RecommendationHistoryController::class, 'show']);
+
+    Route::get('/tourhub/system-ratings', [SystemRatingController::class, 'index']);
+    Route::get('/tourhub/system-ratings/status', [SystemRatingController::class, 'status']);
+    Route::post('/tourhub/system-ratings', [SystemRatingController::class, 'store']);
+    Route::get('/tourhub/system-ratings/{systemRating}', [SystemRatingController::class, 'show']);
+    Route::put('/tourhub/system-ratings/{systemRating}', [SystemRatingController::class, 'update']);
+    Route::patch('/tourhub/system-ratings/{systemRating}', [SystemRatingController::class, 'update']);
+    Route::delete('/tourhub/system-ratings/{systemRating}', [SystemRatingController::class, 'destroy']);
 
     Route::get('/tourhub/wishlist', [ApiWishlistController::class, 'index']);
     Route::post('/tourhub/wishlist/toggle', [ApiWishlistController::class, 'toggle']);
@@ -33,10 +43,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('/user/profile', [ApiProfileController::class, 'show'])
         ->name('api.user.profile.show');
+
     Route::put('/user/profile', [ApiProfileController::class, 'update'])
         ->name('api.user.profile.update');
+
     Route::patch('/user/profile', [ApiProfileController::class, 'update'])
         ->name('api.user.profile.patch');
+
     Route::post('/user/profile/update', [ApiProfileController::class, 'update'])
         ->name('api.user.profile.update.post');
 });
