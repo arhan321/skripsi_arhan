@@ -1,0 +1,160 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Awcodes\Overlook;
+
+use Closure;
+use Filament\Contracts\Plugin;
+use Filament\Panel;
+use Filament\Schemas\Concerns\HasColumns;
+use Filament\Support\Concerns\EvaluatesClosures;
+
+class OverlookPlugin implements Plugin
+{
+    use EvaluatesClosures;
+    use HasColumns;
+
+    protected array|Closure|null $excludes = null;
+
+    protected array|Closure|null $includes = null;
+
+    protected bool|Closure|null $shouldAbbreviateCount = null;
+
+    protected bool|Closure|null $shouldShowTooltips = null;
+
+    protected bool|Closure|null $shouldSortAlphabetical = null;
+
+    protected int|Closure|null $sort = null;
+
+    protected array|Closure|null $icons = null;
+
+    protected bool|Closure|null $withoutTrashed = null;
+
+    public static function make(): self
+    {
+        return app(self::class);
+    }
+
+    public static function get(): static
+    {
+        return filament(app(static::class)->getId());
+    }
+
+    public function getId(): string
+    {
+        return 'awcodes/overlook';
+    }
+
+    public function register(Panel $panel): void {}
+
+    public function boot(Panel $panel): void {}
+
+    public function alphabetical(bool|Closure|null $condition = true): static
+    {
+        $this->shouldSortAlphabetical = $condition;
+
+        return $this;
+    }
+
+    public function abbreviateCount(bool|Closure|null $condition = true): static
+    {
+        $this->shouldAbbreviateCount = $condition;
+
+        return $this;
+    }
+
+    public function excludes(array|Closure $resources): static
+    {
+        $this->excludes = $resources;
+
+        return $this;
+    }
+
+    public function getColumnsConfig(): array
+    {
+        return $this->columns ?? [
+            'default' => 2,
+            'sm' => 2,
+            'md' => 3,
+            'lg' => 4,
+            'xl' => 5,
+            '2xl' => null,
+        ];
+    }
+
+    public function getExcludes(): array
+    {
+        return $this->evaluate($this->excludes) ?? [];
+    }
+
+    public function getIncludes(): array
+    {
+        return $this->evaluate($this->includes) ?? [];
+    }
+
+    public function getSort(): int
+    {
+        return $this->evaluate($this->sort) ?? -1;
+    }
+
+    public function includes(array|Closure $resources): static
+    {
+        $this->includes = $resources;
+
+        return $this;
+    }
+
+    public function shouldAbbreviateCount(): bool
+    {
+        return $this->evaluate($this->shouldAbbreviateCount) ?? true;
+    }
+
+    public function shouldShowTooltips(): bool
+    {
+        return $this->evaluate($this->shouldShowTooltips) ?? true;
+    }
+
+    public function shouldSortAlphabetical(): bool
+    {
+        return $this->evaluate($this->shouldSortAlphabetical) ?? false;
+    }
+
+    public function sort(int|Closure $sort): static
+    {
+        $this->sort = $sort;
+
+        return $this;
+    }
+
+    public function tooltips(bool|Closure|null $condition = true): static
+    {
+        $this->shouldShowTooltips = $condition;
+
+        return $this;
+    }
+
+    public function icons(array|Closure|null $icons): static
+    {
+        $this->icons = $icons;
+
+        return $this;
+    }
+
+    public function getIcons(): array
+    {
+        return $this->evaluate($this->icons) ?? [];
+    }
+
+    public function withoutTrashed(bool|Closure|null $condition = true): static
+    {
+        $this->withoutTrashed = $condition;
+
+        return $this;
+    }
+
+    public function shouldExcludeTrashed(): bool
+    {
+        return $this->evaluate($this->withoutTrashed) ?? false;
+    }
+}

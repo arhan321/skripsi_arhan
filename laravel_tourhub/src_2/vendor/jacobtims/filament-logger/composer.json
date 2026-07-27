@@ -1,0 +1,79 @@
+{
+    "name": "jacobtims/filament-logger",
+    "description": "Activity logger for filament",
+    "keywords": [
+        "Jacobtims",
+        "Z3d0X",
+        "laravel",
+        "filament-logger"
+    ],
+    "homepage": "https://github.com/jacobtims/filament-logger",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ziyaan Hassan",
+            "email": "ziyaan2010@gmail.com",
+            "role": "Developer"
+        },
+        {
+            "name": "Jacobtims",
+            "email": "jacobtimmer04@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "filament/filament": "^4.0|^5.0",
+        "illuminate/contracts": "^11.0 | ^12.0",
+        "laravel/pint": "^1.0",
+        "spatie/laravel-activitylog": "^4.5",
+        "spatie/laravel-package-tools": "^1.13.5"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "nunomaduro/collision": "^8.1",
+        "orchestra/testbench": "^9.0 | ^10.0",
+        "pestphp/pest": "^2.34 | ^3.7",
+        "pestphp/pest-plugin-laravel": "^2.3 | ^3.1",
+        "phpstan/extension-installer": "^1.1",
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpunit/phpunit": "^11.5.3",
+        "spatie/laravel-ray": "^1.26"
+    },
+    "autoload": {
+        "psr-4": {
+            "Jacobtims\\FilamentLogger\\": "src",
+            "Jacobtims\\FilamentLogger\\Database\\Factories\\": "database/factories"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Jacobtims\\FilamentLogger\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "analyse": "vendor/bin/phpstan analyse",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jacobtims\\FilamentLogger\\FilamentLoggerServiceProvider"
+            ],
+            "aliases": {
+                "FilamentLogger": "Jacobtims\\FilamentLogger\\Facades\\FilamentLogger"
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
