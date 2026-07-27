@@ -12,7 +12,7 @@ services:
       DATA_SOURCE: "laravel"
       DATA_PATH: "/app/data/cleaned_dataaset_bali.csv"
 
-      LARAVEL_DATASET_URL: "https://prediksi.djncloud.my.id/api/internal/tourist-destinations"
+      LARAVEL_DATASET_URL: "https://tourhub.my.id/api/internal/tourist-destinations"
       LARAVEL_INTERNAL_KEY: "123"
 
       DATASET_REQUEST_TIMEOUT: "30"

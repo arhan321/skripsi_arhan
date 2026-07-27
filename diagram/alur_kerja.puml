@@ -1,0 +1,154 @@
+@startuml
+
+skinparam monochrome true
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam dpi 180
+skinparam padding 15
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 20
+skinparam defaultTextAlignment center
+
+skinparam ArrowColor black
+skinparam ArrowFontColor black
+skinparam ArrowFontSize 17
+skinparam ArrowThickness 2
+
+skinparam activity {
+    BackgroundColor white
+    BorderColor black
+    FontColor black
+    FontName Arial
+    FontSize 20
+    DiamondBackgroundColor white
+    DiamondBorderColor black
+    DiamondFontColor black
+    StartColor black
+    EndColor black
+    BarColor black
+}
+
+start
+
+:Pengguna membuka TourHub;
+
+:Pengguna mengisi preferensi wisata;
+
+:Aplikasi Flutter mengirim data
+ke Laravel API;
+
+:Laravel melakukan autentikasi
+dan validasi data;
+
+if (Data masukan valid?) then (Ya)
+
+    :Laravel membentuk payload
+    rekomendasi;
+
+    :Pemetaan lokasi
+    ke kode ADM4;
+
+    :TourHubMlService mengirim JSON
+    ke endpoint POST /recommend FastAPI;
+
+else (Tidak)
+
+    :Laravel mengirim
+    pesan kesalahan;
+
+    :Flutter menampilkan pesan
+    kepada pengguna;
+
+    stop
+
+endif
+
+if (Menggunakan cuaca BMKG?) then (Ya)
+
+    if (Kode ADM4 tersedia?) then (Ya)
+
+        :FastAPI meminta data cuaca
+        ke API BMKG;
+
+        if (Data cuaca berhasil diperoleh?) then (Ya)
+
+            :FastAPI mengelompokkan cuaca:
+            cerah, berawan, atau hujan;
+
+        else (Tidak)
+
+            :FastAPI menggunakan cuaca cerah
+            sebagai fallback;
+
+        endif
+
+    else (Tidak)
+
+        :FastAPI menggunakan pengaturan cuaca
+        manual atau default;
+
+    endif
+
+else (Tidak)
+
+    :FastAPI menggunakan pengaturan cuaca
+    manual atau default;
+
+endif
+
+:FastAPI memproses
+Content-Based Filtering;
+
+:Perhitungan kemiripan cosine
+dengan karakteristik destinasi;
+
+:Penyaringan kandidat berdasarkan
+lokasi dan rating minimum;
+
+:Context-Aware
+Recommender System;
+
+if (Cuaca terdeteksi hujan?) then (Ya)
+
+    :Strict weather filter menyaring
+    destinasi bertipe outdoor;
+
+else (Tidak)
+
+    :Seluruh kandidat yang sesuai
+    tetap diproses;
+
+endif
+
+:Perhitungan base score;
+
+:Perhitungan context multiplier:
+cuaca, hari kunjungan, high season,
+tipe wisata, dan popularitas;
+
+:Perhitungan final score;
+
+:Pengurutan destinasi berdasarkan
+final score tertinggi;
+
+:FastAPI mengirim respons JSON
+ke Laravel;
+
+:Laravel menghitung
+waktu respons;
+
+:Laravel menyimpan request dan response
+pada RecommendationLog;
+
+:Laravel mengirim hasil rekomendasi
+ke Flutter;
+
+:Flutter menampilkan rekomendasi
+dan alasan pemilihan destinasi;
+
+:Pengguna melihat hasil rekomendasi;
+
+stop
+
+@enduml
