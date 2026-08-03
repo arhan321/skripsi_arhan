@@ -6,6 +6,49 @@
         <title>TourHub Bali - Rekomendasi Wisata</title>
         <meta name="csrf-token" content="{{ csrf_token() }}" />
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            window.TourHubSystemRatingModal = {
+                open() {
+                    const modal = document.getElementById('tourhub-system-rating-modal')
+
+                    if (!modal) {
+                        return
+                    }
+
+                    modal.classList.add('is-open')
+                    modal.setAttribute('aria-hidden', 'false')
+                    document.body.classList.add('tourhub-rating-lock')
+
+                    window.setTimeout(() => {
+                        modal.querySelector('input[name="rating"]:checked')?.focus()
+                    }, 50)
+                },
+
+                close() {
+                    const modal = document.getElementById('tourhub-system-rating-modal')
+
+                    if (!modal) {
+                        return
+                    }
+
+                    modal.classList.remove('is-open')
+                    modal.setAttribute('aria-hidden', 'true')
+                    document.body.classList.remove('tourhub-rating-lock')
+                },
+
+                dismiss(recommendationLogId = null) {
+                    if (recommendationLogId) {
+                        try {
+                            sessionStorage.setItem(`tourhub_system_rating_dismissed_${recommendationLogId}`, '1')
+                        } catch (error) {
+                            // Browser mungkin memblokir sessionStorage.
+                        }
+                    }
+
+                    this.close()
+                },
+            }
+        </script>
 
         <style>
             html {
@@ -847,7 +890,7 @@
                  *   tetapi pengecekan "sudah rating / belum" berbasis user_id saja.
                  * =========================================================
                  */
-                $systemRatingApiEndpoint = url('/api/tourhub/system-ratings');
+                $systemRatingStoreEndpoint = route('system-ratings.store');
                 $systemRatingStatusEndpoint = url('/api/tourhub/system-ratings/status');
 
                 $systemRatingRecommendationLogId = data_get($result ?? [], 'recommendation_log_id')
@@ -1619,6 +1662,9 @@
                                         <button
                                             type="button"
                                             data-system-rating-open
+                                            aria-haspopup="dialog"
+                                            aria-controls="tourhub-system-rating-modal"
+                                            onclick="window.TourHubSystemRatingModal.open()"
                                             class="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800"
                                         >
                                             Beri Rating Sistem
@@ -1626,6 +1672,7 @@
                                         <button
                                             type="button"
                                             data-system-rating-dismiss
+                                            onclick="window.TourHubSystemRatingModal.dismiss({{ $systemRatingRecommendationLogId }})"
                                             class="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50"
                                         >
                                             Nanti saja
@@ -2416,10 +2463,14 @@
                     class="tourhub-system-rating-modal"
                     aria-hidden="true"
                     data-open-on-load="1"
-                    data-rating-endpoint="{{ $systemRatingApiEndpoint }}"
+                    data-rating-endpoint="{{ $systemRatingStoreEndpoint }}"
                     data-recommendation-log-id="{{ $systemRatingRecommendationLogId }}"
                 >
-                    <div class="tourhub-system-rating-backdrop" data-system-rating-close></div>
+                    <div
+                        class="tourhub-system-rating-backdrop"
+                        data-system-rating-close
+                        onclick="window.TourHubSystemRatingModal.close()"
+                    ></div>
 
                     <div
                         class="tourhub-system-rating-panel"
@@ -2444,6 +2495,7 @@
                                 <button
                                     type="button"
                                     data-system-rating-close
+                                    onclick="window.TourHubSystemRatingModal.close()"
                                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl font-black text-white ring-1 ring-white/10 transition hover:bg-white/20"
                                     aria-label="Tutup rating sistem"
                                 >
@@ -2453,7 +2505,13 @@
                         </div>
 
                         <div class="p-6">
-                            <form id="tourhub-system-rating-form" class="space-y-5">
+                            <form
+                                id="tourhub-system-rating-form"
+                                class="space-y-5"
+                                method="POST"
+                                action="{{ $systemRatingStoreEndpoint }}"
+                            >
+                                @csrf
                                 <input
                                     type="hidden"
                                     name="recommendation_log_id"
@@ -2518,6 +2576,7 @@
                                     <button
                                         type="button"
                                         data-system-rating-dismiss
+                                        onclick="window.TourHubSystemRatingModal.dismiss({{ $systemRatingRecommendationLogId }})"
                                         class="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200"
                                     >
                                         Nanti saja
@@ -2546,6 +2605,7 @@
                                 <button
                                     type="button"
                                     data-system-rating-close
+                                    onclick="window.TourHubSystemRatingModal.close()"
                                     class="mt-5 inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
                                 >
                                     Selesai
@@ -2573,36 +2633,12 @@
                 const ratingSuccess = document.getElementById('tourhub-system-rating-success')
                 const ratingCsrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
 
-                const openSystemRatingModal = () => {
-                    if (!ratingModal) {
-                        return
-                    }
+                const openSystemRatingModal = () => window.TourHubSystemRatingModal.open()
 
-                    ratingModal.classList.add('is-open')
-                    ratingModal.setAttribute('aria-hidden', 'false')
-                    document.body.classList.add('tourhub-rating-lock')
-                }
-
-                const closeSystemRatingModal = () => {
-                    if (!ratingModal) {
-                        return
-                    }
-
-                    ratingModal.classList.remove('is-open')
-                    ratingModal.setAttribute('aria-hidden', 'true')
-                    document.body.classList.remove('tourhub-rating-lock')
-                }
+                const closeSystemRatingModal = () => window.TourHubSystemRatingModal.close()
 
                 const dismissSystemRatingModal = () => {
-                    if (ratingModal?.dataset?.recommendationLogId) {
-                        try {
-                            sessionStorage.setItem(`tourhub_system_rating_dismissed_${ratingModal.dataset.recommendationLogId}`, '1')
-                        } catch (error) {
-                            // Browser mungkin memblokir sessionStorage, jadi abaikan saja.
-                        }
-                    }
-
-                    closeSystemRatingModal()
+                    window.TourHubSystemRatingModal.dismiss(ratingModal?.dataset?.recommendationLogId)
                 }
 
                 const showRatingMessage = (type, message) => {
@@ -2703,7 +2739,9 @@
                         return
                     }
 
-                    const endpoint = ratingModal?.dataset?.ratingEndpoint || '/api/tourhub/system-ratings'
+                    const endpoint = ratingModal?.dataset?.ratingEndpoint
+                        || ratingForm.getAttribute('action')
+                        || '/system-ratings'
                     const submitText = ratingSubmitButton?.textContent || 'Kirim Rating'
 
                     if (ratingSubmitButton) {

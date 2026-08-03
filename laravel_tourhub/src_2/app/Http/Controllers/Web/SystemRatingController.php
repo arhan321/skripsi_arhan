@@ -1,16 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\RecommendationLog;
 use App\Models\SystemRating;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
-class SystemRatingController extends Controller
+final class SystemRatingController extends Controller
 {
     /**
      * Simpan atau perbarui rating sistem dari halaman web/Blade.
@@ -18,9 +22,9 @@ class SystemRatingController extends Controller
      * Catatan:
      * - Rating ini adalah rating kualitas sistem rekomendasi TourHub.
      * - Bukan rating tempat wisata.
-     * - Satu user hanya punya satu rating untuk satu recommendation_log_id.
+     * - Satu user hanya punya satu rating sistem.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'recommendation_log_id' => ['required', 'integer', 'exists:recommendation_logs,id'],
@@ -28,6 +32,7 @@ class SystemRatingController extends Controller
             'comment' => ['nullable', 'string', 'max:1000'],
             'source' => ['nullable', 'string', 'max:100'],
             'platform' => ['nullable', 'string', Rule::in(['web', 'mobile', 'api'])],
+            'metadata' => ['nullable', 'array'],
         ], [
             'recommendation_log_id.required' => 'Riwayat rekomendasi tidak ditemukan.',
             'recommendation_log_id.exists' => 'Riwayat rekomendasi tidak valid.',
@@ -37,9 +42,17 @@ class SystemRatingController extends Controller
             'rating.max' => 'Rating maksimal 5 bintang.',
             'comment.max' => 'Komentar maksimal 1000 karakter.',
             'platform.in' => 'Platform rating tidak valid.',
+            'metadata.array' => 'Metadata rating harus berupa data yang valid.',
         ]);
 
         if (! Schema::hasTable('system_ratings')) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tabel system_ratings belum tersedia. Jalankan migration rating system terlebih dahulu.',
+                ], 503);
+            }
+
             return back()
                 ->withInput()
                 ->with('error', 'Tabel system_ratings belum tersedia. Jalankan migration rating system terlebih dahulu.');
@@ -48,6 +61,13 @@ class SystemRatingController extends Controller
         $user = $request->user();
 
         if (! $user) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu untuk memberikan rating sistem.',
+                ], 401);
+            }
+
             return redirect()
                 ->route('user.login')
                 ->with('error', 'Silakan login terlebih dahulu untuk memberikan rating sistem.');
@@ -59,27 +79,28 @@ class SystemRatingController extends Controller
             ->first();
 
         if (! $recommendationLog) {
-            return back()
-                ->withInput()
-                ->with('error', 'Riwayat rekomendasi tidak ditemukan atau bukan milik akun kamu.');
+            throw ValidationException::withMessages([
+                'recommendation_log_id' => 'Riwayat rekomendasi tidak ditemukan atau bukan milik akun kamu.',
+            ]);
         }
 
         if ($recommendationLog->status !== 'success') {
-            return back()
-                ->withInput()
-                ->with('error', 'Rating hanya bisa diberikan pada rekomendasi yang berhasil.');
+            throw ValidationException::withMessages([
+                'recommendation_log_id' => 'Rating hanya bisa diberikan pada rekomendasi yang berhasil.',
+            ]);
         }
 
         $systemRating = SystemRating::query()->updateOrCreate(
             [
                 'user_id' => $user->id,
-                'recommendation_log_id' => $recommendationLog->id,
             ],
             [
+                'recommendation_log_id' => $recommendationLog->id,
                 'rating' => (int) $validated['rating'],
                 'comment' => $validated['comment'] ?? null,
                 'source' => $validated['source'] ?? 'web_page',
                 'platform' => $validated['platform'] ?? 'web',
+                'metadata' => $validated['metadata'] ?? null,
                 'rated_at' => now(),
             ]
         );
@@ -87,6 +108,14 @@ class SystemRatingController extends Controller
         $message = $systemRating->wasRecentlyCreated
             ? 'Terima kasih, rating sistem berhasil dikirim.'
             : 'Rating sistem berhasil diperbarui.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => $systemRating->fresh(),
+            ], $systemRating->wasRecentlyCreated ? 201 : 200);
+        }
 
         return back()->with('success', $message);
     }
