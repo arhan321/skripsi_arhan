@@ -494,10 +494,17 @@
     <body class="min-h-screen bg-slate-100 text-slate-950 antialiased">
         <div class="soft-grid min-h-screen">
             @php
-                $selectedKategori = old(
-                    'kategori_preferensi',
-                    data_get($payload ?? [], 'kategori_preferensi', ['Alam']),
-                );
+                /*
+                 * CODE MATI - pilihan kategori awal.
+                 *
+                 * $selectedKategori = old(
+                 *     'kategori_preferensi',
+                 *     data_get($payload ?? [], 'kategori_preferensi', ['Alam']),
+                 * );
+                 *
+                 * Kategori Alam, Budaya, Rekreasi, dan Umum sekarang diproses
+                 * sekaligus. Filter baru dipakai setelah hasil rekomendasi ada.
+                 */
 
                 $locationOptions = [
                     'Kabupaten Gianyar' => ['Ubud', 'Gianyar', 'Tegallalang', 'Blahbatuh', 'Tampaksiring', 'Sukawati', 'Payangan'],
@@ -526,18 +533,15 @@
                     }
                 }
 
-                // Cuaca tidak lagi dipilih manual oleh user.
-                // Nilai ini hanya sebagai fallback jika Otomatis gagal/tidak tersedia.
-                $selectedCuaca = 'cerah';
-
-                $selectedVisitDay = old('visit_day', data_get($payload ?? [], 'visit_day', 'weekday'));
-
-                $isHighSeason = old('is_high_season', data_get($payload ?? [], 'is_high_season', false));
-
-                // Otomatis dibuat aktif otomatis agar user tidak perlu memilih cuaca manual.
-                $useBmkg = true;
-
-                $selectedKategoriArray = (array) $selectedKategori;
+                /*
+                 * CODE MATI - state form lama yang sudah tidak dipakai.
+                 *
+                 * $selectedVisitDay = old('visit_day', data_get($payload ?? [], 'visit_day', 'weekday'));
+                 * $selectedCuaca = 'cerah';
+                 * $isHighSeason = old('is_high_season', data_get($payload ?? [], 'is_high_season', false));
+                 * $useBmkg = true;
+                 * $selectedKategoriArray = (array) $selectedKategori;
+                 */
 
                 /*
                  * Keterangan periode Otomatis untuk ditampilkan di UI.
@@ -545,7 +549,6 @@
                  * dengan 8 data per hari atau interval sekitar 3 jam.
                  */
                 $bmkgForecastPeriodText = 'Info cuaca 3 hari kedepan';
-                $bmkgForecastIntervalText = 'Cuaca diperbarui berkala';
 
 
                 /*
@@ -613,20 +616,26 @@
                     return match ($tipe) {
                         'outdoor' => 'Luar ruangan',
                         'indoor' => 'Dalam ruangan',
-                        'mixed' => 'Fleksibel',
+                        // Nilai API tetap "mixed", tetapi label user mengikuti kategori awal.
+                        'mixed' => 'Umum',
                         default => $tipe !== '' ? ucfirst($tipe) : '-',
                     };
                 };
 
-                $labelHariKunjungan = function ($hari): string {
-                    $hari = strtolower(trim((string) $hari));
-
-                    return match ($hari) {
-                        'weekday' => 'Hari biasa',
-                        'weekend' => 'Akhir pekan',
-                        default => $hari !== '' ? ucfirst($hari) : '-',
-                    };
-                };
+                /*
+                 * CODE MATI - formatter Hari Kunjungan lama. Field tidak lagi
+                 * dirender dan controller selalu mengirim default weekend.
+                 *
+                 * $labelHariKunjungan = function ($hari): string {
+                 *     $hari = strtolower(trim((string) $hari));
+                 *
+                 *     return match ($hari) {
+                 *         'weekday' => 'Hari biasa',
+                 *         'weekend' => 'Akhir pekan',
+                 *         default => $hari !== '' ? ucfirst($hari) : '-',
+                 *     };
+                 * };
+                 */
 
                 $friendlyReason = function ($item, int $index = 0) use ($labelKesesuaian, $labelKondisi, $labelTipeWisata): string {
                     $nama = trim((string) data_get($item, 'nama_tempat_wisata', 'Destinasi ini'));
@@ -692,7 +701,7 @@
                     $reason = str_ireplace('user', 'kamu', $reason);
                     $reason = str_ireplace('outdoor', 'luar ruangan', $reason);
                     $reason = str_ireplace('indoor', 'dalam ruangan', $reason);
-                    $reason = str_ireplace('mixed', 'fleksibel', $reason);
+                    $reason = str_ireplace('mixed', 'umum', $reason);
                     $reason = str_ireplace('weekend', 'akhir pekan', $reason);
                     $reason = str_ireplace('weekday', 'hari biasa', $reason);
 
@@ -965,7 +974,7 @@
 
             @endphp
 
-            {{-- Jumlah Hasilavigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
+            {{-- Navigation: Travel app style. Menu Profile ditambahkan agar konsisten dengan Dashboard User. --}}
             <header class="tourhub-nav-glass sticky top-0 z-50 border-b border-white/80 shadow-[0_12px_34px_rgba(15,23,42,0.08)]">
                 <div class="mx-auto max-w-7xl px-4 sm:px-6">
                     <div class="flex min-h-[76px] items-center justify-between gap-3 py-3">
@@ -1148,7 +1157,9 @@
                             Rekomendasi
                         </a>
                         <a href="#hasil" data-scroll-link class="nav-scroll-link whitespace-nowrap">Hasil Terbaik</a>
-                        <a href="#kategori" data-scroll-link class="nav-scroll-link whitespace-nowrap">Kategori</a>
+                        @isset($result)
+                            <a href="#kategori" data-scroll-link class="nav-scroll-link whitespace-nowrap">Tipe Wisata</a>
+                        @endisset
                         <a href="#bmkg" data-scroll-link class="nav-scroll-link whitespace-nowrap">Cuaca Terkini</a>
                         <a href="#log" data-scroll-link class="nav-scroll-link whitespace-nowrap">Riwayat Terbaru</a>
                         @if ($shouldAskSystemRating)
@@ -1178,8 +1189,7 @@
                         </h2>
 
                         <p class="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-                            Cari destinasi wisata berdasarkan preferensi, lokasi, rating, cuaca, hari kunjungan, dan
-                            kondisi high season.
+                            Cari destinasi wisata berdasarkan preferensi, lokasi, rating, dan cuaca otomatis BMKG.
                         </p>
                     </div>
 
@@ -1239,7 +1249,7 @@
                                             Mau liburan ke mana?
                                         </h3>
                                         <p class="mt-1 text-sm text-slate-600">
-                                            Isi pilihan wisatamu, lalu TourHub akan mencarikan destinasi yang paling sesuai.
+                                            Pilih daerah dan rating. TourHub akan mencari semua kategori wisata yang paling sesuai dengan cuaca BMKG.
                                         </p>
                                     </div>
 
@@ -1253,6 +1263,20 @@
                             </div>
 
                             <div class="p-5 md:p-6">
+                                @if (session('error'))
+                                    <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+                                        <div class="flex items-start gap-3">
+                                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
+                                                ⚠️
+                                            </div>
+                                            <div>
+                                                <p class="font-black">Layanan rekomendasi tidak tersedia</p>
+                                                <p class="mt-1 leading-6">{{ session('error') }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
                                 @if ($errors->any())
                                     <div
                                         class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
@@ -1284,7 +1308,29 @@
                                 >
                                     @csrf
 
-                                    <div id="kategori" class="section-anchor">
+                                    <div class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-emerald-50 p-4 md:p-5">
+                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div class="flex items-start gap-3">
+                                                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-2xl">
+                                                    🧭
+                                                </span>
+                                                <div>
+                                                    <p class="text-sm font-black text-slate-950">Semua Kategori Wisata</p>
+                                                    <p class="mt-1 text-xs leading-5 text-slate-600">
+                                                        Alam, Budaya, Rekreasi, dan Umum dicari sekaligus tanpa filter kategori di awal.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span class="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+                                                Aktif otomatis
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {{--
+                                    CODE MATI - UI kategori preferensi lama. Seluruh kode lama
+                                    dipertahankan untuk kebutuhan pembanding/rollback dan tidak dirender.
+                                    <div id="kategori-lama" class="section-anchor">
                                         <div class="mb-3 flex items-center justify-between gap-4">
                                             <label class="block text-sm font-black text-slate-800">
                                                 Kategori Preferensi
@@ -1332,9 +1378,10 @@
                                             @endforeach
                                         </div>
                                     </div>
+                                    --}}
 
-                                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-                                        <div class="lg:col-span-8">
+                                    <div>
+                                        <div>
                                             <label
                                                 for="lokasi_wisata"
                                                 class="mb-1 block text-xs font-bold tracking-wide text-slate-500 uppercase"
@@ -1383,6 +1430,8 @@
                                             </p>
                                         </div>
 
+                                        {{--
+                                        CODE MATI - filter kata kunci lama.
                                         <div class="lg:col-span-4">
                                             <label
                                                 for="keywords"
@@ -1400,9 +1449,10 @@
                                                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400"
                                             />
                                         </div>
+                                        --}}
                                     </div>
 
-                                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div>
                                             <label
                                                 for="min_rating"
@@ -1423,6 +1473,9 @@
                                             />
                                         </div>
 
+                                        {{--
+                                        CODE MATI - filter jumlah hasil lama. Sistem sekarang mengambil
+                                        kandidat sebanyak mungkin dari API lalu menampilkannya dengan pagination.
                                         <div>
                                             <label
                                                 for="top_n"
@@ -1441,6 +1494,7 @@
                                                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-900"
                                             />
                                         </div>
+                                        --}}
 
                                         <div>
                                             <label
@@ -1466,6 +1520,9 @@
                                             <input type="hidden" name="weather" value="cerah" />
                                         </div>
 
+                                        {{--
+                                        CODE MATI - pilihan Hari Kunjungan lama. Controller sekarang
+                                        selalu memakai nilai weekend tanpa menampilkan input kepada user.
                                         <div>
                                             <label
                                                 for="visit_day"
@@ -1486,11 +1543,12 @@
                                                 @endforeach
                                             </select>
                                         </div>
+                                        --}}
                                     </div>
 
                                     <div id="bmkg" class="section-anchor grid grid-cols-1 gap-3 lg:grid-cols-12">
                                         <label
-                                            class="flex cursor-pointer items-center justify-between rounded-3xl border border-blue-100 bg-blue-50/70 px-4 py-4 lg:col-span-4"
+                                            class="flex cursor-pointer items-center justify-between rounded-3xl border border-blue-100 bg-blue-50/70 px-4 py-4 lg:col-span-6"
                                         >
                                             <span class="flex items-start gap-3">
                                                 <span
@@ -1517,6 +1575,9 @@
                                             </span>
                                         </label>
 
+                                        {{--
+                                        CODE MATI - pilihan Musim Ramai lama. Nilai is_high_season kini
+                                        selalu false dari controller agar perilaku API lama tetap kompatibel.
                                         <label
                                             class="flex cursor-pointer items-center justify-between rounded-3xl border border-slate-200 bg-white px-4 py-4 lg:col-span-4"
                                         >
@@ -1547,9 +1608,10 @@
                                                 />
                                             </span>
                                         </label>
+                                        --}}
 
                                         <div
-                                            class="rounded-3xl border border-blue-200 bg-white p-4 text-xs leading-5 text-blue-800 lg:col-span-4"
+                                            class="rounded-3xl border border-blue-200 bg-white p-4 text-xs leading-5 text-blue-800 lg:col-span-6"
                                         >
                                             <p class="font-black text-blue-900">Catatan Otomatis</p>
                                             <p class="mt-1">
@@ -1602,26 +1664,43 @@
                     </div>
                 @endif
 
+                {{--
+                CODE MATI - alert error lama berada di bawah form. Alert aktif dipindahkan
+                ke bagian paling atas kartu form agar gangguan BMKG langsung terlihat.
                 @if (session('error'))
                     <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-700 shadow-sm">
                         {{ session('error') }}
                     </div>
                 @endif
+                --}}
 
                 {{-- Result Content --}}
                 <section id="hasil" class="section-anchor space-y-6">
                     @isset($result)
                         @php
                             /*
-                             * Sorting utama:
-                             * Semua rekomendasi diurutkan berdasarkan final_score tertinggi.
-                             * Item pertama setelah sorting dianggap sebagai paling direkomendasikan.
+                             * Controller sudah menangani sorting, filter tipe wisata, dan pagination.
+                             * Fallback di bawah menjaga kompatibilitas jika view dipanggil dari kode lama.
                              */
-                            $recommendations = collect(data_get($result, 'recommendations', []))
-                                ->sortByDesc(fn ($item) => (float) data_get($item, 'final_score', 0))
-                                ->values();
+                            if (! isset($recommendations)) {
+                                $recommendations = collect(data_get($result, 'recommendations', []))
+                                    ->sortByDesc(fn ($item) => (float) data_get($item, 'final_score', 0))
+                                    ->values();
 
-                            $bestRecommendation = $recommendations->first();
+                                $bestRecommendation = $recommendations->first();
+                            } else {
+                                $bestRecommendation = $bestRecommendation ?? null;
+                            }
+
+                            $recommendationTotal = $recommendationTotal ?? $recommendations->count();
+                            $filteredRecommendationTotal = $filteredRecommendationTotal ?? $recommendations->count();
+                            $resultTypeFilter = $resultTypeFilter ?? 'all';
+                            $resultTypeCounts = $resultTypeCounts ?? [
+                                'all' => $recommendationTotal,
+                                'outdoor' => 0,
+                                'indoor' => 0,
+                                'mixed' => 0,
+                            ];
                         @endphp
 
                         @if ($shouldAskSystemRating)
@@ -1704,15 +1783,15 @@
                                             <span class="rounded-full bg-slate-950 px-3 py-1 text-white">
                                                 Cuaca: {{ data_get($result, 'weather_used') ?? '-' }}
                                             </span>
-<span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                                            <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
                                                 Pilihan tersedia
                                             </span>
-</div>
+                                        </div>
 
                                         @if (strtolower((string) data_get($result, 'weather_used')) === 'hujan')
                                             <div class="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
                                                 🌧️ Otomatis mendeteksi potensi hujan pada wilayah ini. Sistem otomatis
-                                                memprioritaskan destinasi dalam ruangan atau tempat yang fleksibel agar perjalanan lebih nyaman.
+                                                memprioritaskan destinasi Indoor atau Umum agar perjalanan lebih nyaman.
                                             </div>
                                         @endif
                                     </div>
@@ -1722,14 +1801,81 @@
                                             Pilihan Wisata
                                         </p>
                                         <p class="mt-1 text-3xl font-black text-slate-950">
-                                            {{ $recommendations->count() }}
+                                            {{ $filteredRecommendationTotal }}
                                         </p>
-                                        <p class="text-xs font-bold text-blue-700">Pilihan Wisata</p>
+                                        <p class="text-xs font-bold text-blue-700">
+                                            @if ($resultTypeFilter !== 'all')
+                                                dari {{ $recommendationTotal }} hasil
+                                            @else
+                                                Pilihan Wisata
+                                            @endif
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="p-6">
+                                @php
+                                    $resultTypeOptions = [
+                                        'all' => ['label' => 'Semua', 'icon' => '🧭'],
+                                        'outdoor' => ['label' => 'Outdoor', 'icon' => '🌿'],
+                                        'indoor' => ['label' => 'Indoor', 'icon' => '🏛️'],
+                                        'mixed' => ['label' => 'Umum', 'icon' => '✨'],
+                                    ];
+                                @endphp
+
+                                <div
+                                    id="kategori"
+                                    class="section-anchor mb-8 rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5"
+                                >
+                                    <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                                        <div>
+                                            <p class="text-xs font-black tracking-wider text-blue-700 uppercase">
+                                                Filter Setelah Rekomendasi
+                                            </p>
+                                            <h3 class="mt-1 text-xl font-black text-slate-950">
+                                                Pilih tipe tempat wisata
+                                            </h3>
+                                            <p class="mt-1 text-sm leading-6 text-slate-600">
+                                                Semua kategori diproses lebih dahulu. Setelah hasil tersedia, kamu bisa memilih wisata Outdoor, Indoor, atau Umum.
+                                            </p>
+                                        </div>
+
+                                        <p class="text-xs font-bold text-slate-500">
+                                            Filter tidak menjalankan ulang rekomendasi maupun BMKG.
+                                        </p>
+                                    </div>
+
+                                    <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                                        @foreach ($resultTypeOptions as $typeKey => $typeOption)
+                                            @php
+                                                $filterQuery = array_filter([
+                                                    'log' => $wishlistActiveLogId,
+                                                    'tipe_wisata' => $typeKey !== 'all' ? $typeKey : null,
+                                                ], fn ($value) => $value !== null && $value !== '');
+                                                $filterUrl = route('tourhub.recommendation.index', $filterQuery) . '#kategori';
+                                                $isActiveType = $resultTypeFilter === $typeKey;
+                                            @endphp
+
+                                            <a
+                                                href="{{ $filterUrl }}"
+                                                @if ($isActiveType) aria-current="true" @endif
+                                                class="{{ $isActiveType ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700' }} flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-black transition"
+                                            >
+                                                <span class="flex items-center gap-2">
+                                                    <span aria-hidden="true">{{ $typeOption['icon'] }}</span>
+                                                    {{ $typeOption['label'] }}
+                                                </span>
+                                                <span
+                                                    class="{{ $isActiveType ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600' }} rounded-full px-2.5 py-1 text-xs"
+                                                >
+                                                    {{ $resultTypeCounts[$typeKey] ?? 0 }}
+                                                </span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+
                                 @if ($bestRecommendation)
                                     <div
                                         class="mb-8 overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-blue-50 shadow-lg shadow-amber-900/5"
@@ -1943,8 +2089,14 @@
 
                                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                                     @forelse ($recommendations as $index => $item)
+                                        @php
+                                            $globalIndex = $recommendations instanceof \Illuminate\Pagination\LengthAwarePaginator
+                                                ? ((int) ($recommendations->firstItem() ?? 1) + $index - 1)
+                                                : $index;
+                                        @endphp
+
                                         <article
-                                            class="group {{ $index === 0 ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white' }} overflow-hidden rounded-3xl border transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10"
+                                            class="group {{ $globalIndex === 0 ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white' }} overflow-hidden rounded-3xl border transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10"
                                         >
                                             <div class="relative h-56 overflow-hidden">
                                                 @if (data_get($item, 'link_gambar'))
@@ -1966,12 +2118,12 @@
                                                 ></div>
 
                                                 <div
-                                                    class="{{ $index === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-950/90 text-white' }} absolute top-4 left-4 rounded-2xl px-3 py-2 text-sm font-black backdrop-blur"
+                                                    class="{{ $globalIndex === 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-950/90 text-white' }} absolute top-4 left-4 rounded-2xl px-3 py-2 text-sm font-black backdrop-blur"
                                                 >
-                                                    {{ $index === 0 ? 'Pilihan Utama' : 'Pilihan Lain' }}
+                                                    {{ $globalIndex === 0 ? 'Pilihan Utama' : 'Pilihan Lain' }}
                                                 </div>
 
-                                                @if ($index === 0)
+                                                @if ($globalIndex === 0)
                                                     <div
                                                         class="absolute top-4 right-4 rounded-2xl bg-white/90 px-3 py-2 text-xs font-black text-amber-700 backdrop-blur"
                                                     >
@@ -1982,14 +2134,14 @@
                                                 <div class="absolute right-4 bottom-4 left-4">
                                                     <p class="text-xs font-bold text-blue-100">Status</p>
                                                     <p class="text-2xl font-black text-white">
-                                                        {{ $labelRekomendasi($item, $index) }}
+                                                        {{ $labelRekomendasi($item, $globalIndex) }}
                                                     </p>
                                                 </div>
                                             </div>
 
                                             <div class="p-5">
                                                 <div class="flex flex-wrap gap-2">
-                                                    @if ($index === 0)
+                                                    @if ($globalIndex === 0)
                                                         <span
                                                             class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700"
                                                         >
@@ -2068,7 +2220,7 @@
                                                 </div>
 
                                                 @php
-                                                    $itemReason = $friendlyReason($item, $index);
+                                                    $itemReason = $friendlyReason($item, $globalIndex);
                                                     $needsToggle = $shouldShowReasonToggle($itemReason);
                                                 @endphp
 
@@ -2154,11 +2306,88 @@
                                             </h3>
 
                                             <p class="mt-2 text-sm text-slate-500">
-                                                Coba kosongkan kata kunci, turunkan rating minimal, atau pilih beberapa kategori.
+                                                @if ($resultTypeFilter !== 'all')
+                                                    Belum ada hasil untuk tipe {{ $resultTypeOptions[$resultTypeFilter]['label'] ?? 'wisata ini' }}. Pilih filter Semua untuk melihat tipe wisata lainnya.
+                                                @else
+                                                    Coba turunkan rating minimal atau pilih wilayah wisata yang lebih luas.
+                                                @endif
                                             </p>
+
+                                            @if ($resultTypeFilter !== 'all')
+                                                <a
+                                                    href="{{ route('tourhub.recommendation.index', ['log' => $wishlistActiveLogId]) }}#kategori"
+                                                    class="mt-4 inline-flex rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700"
+                                                >
+                                                    Lihat Semua Tipe
+                                                </a>
+                                            @endif
                                         </div>
                                     @endforelse
                                 </div>
+
+                                @if ($recommendations instanceof \Illuminate\Pagination\LengthAwarePaginator && $recommendations->hasPages())
+                                    <nav
+                                        class="mt-8 flex flex-col gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                        aria-label="Pagination hasil rekomendasi"
+                                    >
+                                        <p class="text-sm font-semibold text-slate-600">
+                                            Menampilkan
+                                            <span class="font-black text-slate-950">{{ $recommendations->firstItem() }}–{{ $recommendations->lastItem() }}</span>
+                                            dari
+                                            <span class="font-black text-slate-950">{{ $recommendations->total() }}</span>
+                                            hasil
+                                        </p>
+
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            @if ($recommendations->onFirstPage())
+                                                <span class="cursor-not-allowed rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-400">
+                                                    ← Sebelumnya
+                                                </span>
+                                            @else
+                                                <a
+                                                    href="{{ $recommendations->previousPageUrl() }}#kategori"
+                                                    rel="prev"
+                                                    class="rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:text-blue-700"
+                                                >
+                                                    ← Sebelumnya
+                                                </a>
+                                            @endif
+
+                                            @for ($pageNumber = 1; $pageNumber <= $recommendations->lastPage(); $pageNumber++)
+                                                @if ($pageNumber === $recommendations->currentPage())
+                                                    <span
+                                                        aria-current="page"
+                                                        class="flex h-10 min-w-10 items-center justify-center rounded-xl bg-blue-600 px-3 text-sm font-black text-white shadow-md shadow-blue-600/20"
+                                                    >
+                                                        {{ $pageNumber }}
+                                                    </span>
+                                                @else
+                                                    <a
+                                                        href="{{ $recommendations->url($pageNumber) }}#kategori"
+                                                        class="flex h-10 min-w-10 items-center justify-center rounded-xl bg-white px-3 text-sm font-black text-slate-700 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:text-blue-700"
+                                                        aria-label="Buka halaman {{ $pageNumber }}"
+                                                    >
+                                                        {{ $pageNumber }}
+                                                    </a>
+                                                @endif
+                                            @endfor
+
+                                            @if ($recommendations->hasMorePages())
+                                                <a
+                                                    href="{{ $recommendations->nextPageUrl() }}#kategori"
+                                                    rel="next"
+                                                    class="rounded-xl bg-white px-3 py-2 text-sm font-black text-slate-700 ring-1 ring-slate-200 transition hover:bg-blue-50 hover:text-blue-700"
+                                                >
+                                                    Berikutnya →
+                                                </a>
+                                            @else
+                                                <span class="cursor-not-allowed rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-400">
+                                                    Berikutnya →
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </nav>
+                                @endif
                             </div>
                         </div>
 
@@ -2179,19 +2408,21 @@
                                     </h2>
 
                                     <p class="mt-3 text-sm leading-6 text-slate-600">
-                                        Isi pilihan wisata pada kotak pencarian di atas untuk mendapatkan rekomendasi Bali. Hasilnya akan langsung tersimpan di riwayat akunmu.
+                                        Pilih daerah dan rating minimal pada kotak pencarian di atas. Semua kategori wisata akan diproses sekaligus menggunakan cuaca otomatis BMKG dan hasilnya langsung tersimpan di riwayat akunmu.
                                     </p>
 
                                     <div class="mt-6 grid grid-cols-1 gap-3">
                                         <div class="rounded-2xl bg-slate-50 p-4">
-                                            <p class="font-black text-slate-900">1. Pilih kategori</p>
-                                            <p class="mt-1 text-sm text-slate-500">Contoh: Alam dan Budaya.</p>
+                                            <p class="font-black text-slate-900">1. Pilih lokasi</p>
+                                            <p class="mt-1 text-sm text-slate-500">
+                                                Contoh: Kabupaten Gianyar, Kecamatan Ubud.
+                                            </p>
                                         </div>
 
                                         <div class="rounded-2xl bg-slate-50 p-4">
-                                            <p class="font-black text-slate-900">2. Isi lokasi</p>
+                                            <p class="font-black text-slate-900">2. Atur kebutuhan kunjungan</p>
                                             <p class="mt-1 text-sm text-slate-500">
-                                                Contoh: Kabupaten Gianyar, Kecamatan Ubud.
+                                                Tentukan rating minimal. Cuaca akan dibaca otomatis dari BMKG.
                                             </p>
                                         </div>
 
@@ -2213,7 +2444,7 @@
                                             <p class="text-sm font-bold text-blue-200">Panduan TourHub</p>
                                             <h3 class="mt-3 text-4xl font-black">Rekomendasi Pintar</h3>
                                             <p class="mt-3 text-sm leading-6 text-slate-300">
-                                                Rekomendasi dibuat berdasarkan pilihan wisata, rating, popularitas, lokasi, dan kondisi cuaca.
+                                                Rekomendasi dibuat berdasarkan rating, popularitas, lokasi, dan kondisi cuaca BMKG.
                                             </p>
                                         </div>
 

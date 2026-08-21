@@ -17,8 +17,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\View as ViewFacade;
-use Illuminate\Validation\ValidationException;
 
 final class RecommendationController extends Controller
 {
@@ -37,6 +37,28 @@ final class RecommendationController extends Controller
      * Nilai ini memakai wilayah Ubud, Gianyar.
      */
     private const DEFAULT_BALI_ADM4 = '51.04.05.1005';
+
+    /**
+     * FastAPI saat ini membatasi top_n maksimal 50.
+     *
+     * Nilai ini tidak lagi ditampilkan sebagai input kepada user. Laravel selalu
+     * meminta jumlah terbesar yang didukung FastAPI, kemudian hasilnya difilter
+     * dan dipaginasi pada halaman web setelah proses rekomendasi selesai.
+     */
+    private const RECOMMENDATION_FETCH_LIMIT = 50;
+
+    /** Jumlah kartu rekomendasi dalam satu halaman hasil. */
+    private const RECOMMENDATIONS_PER_PAGE = 9;
+
+    /**
+     * Filter tipe wisata yang tersedia setelah rekomendasi selesai dibuat.
+     *
+     * @var array<int, string>
+     */
+    private const RESULT_TYPE_FILTERS = ['all', 'outdoor', 'indoor', 'mixed'];
+
+    /** Pesan aman yang ditampilkan jika BMKG atau layanan rekomendasi bermasalah. */
+    private const SERVICE_UNAVAILABLE_MESSAGE = 'Sistem TourHub sedang tidak dapat digunakan karena layanan cuaca BMKG tidak terdeteksi atau sedang mengalami gangguan. Silakan coba lagi nanti.';
 
     public function index(Request $request): View
     {
@@ -66,7 +88,7 @@ final class RecommendationController extends Controller
                     'result' => $log->response_payload,
                     'responseTimeMs' => $log->response_time_ms,
                     'activeLog' => $log,
-                ]);
+                ], $this->buildResultViewData($request, $log));
             }
         }
 
@@ -93,12 +115,6 @@ final class RecommendationController extends Controller
         $locationPairValues = $this->locationPairValues();
 
         $validated = $request->validate([
-            'kategori_preferensi' => ['required', 'array', 'min:1'],
-            'kategori_preferensi.*' => [
-                'required',
-                Rule::in(['Alam', 'Budaya', 'Rekreasi', 'Umum']),
-            ],
-
             'lokasi_wisata' => [
                 'nullable',
                 'string',
@@ -110,34 +126,77 @@ final class RecommendationController extends Controller
             // yang masih mengirim kabupaten_kota dan kecamatan secara terpisah.
             'kabupaten_kota' => ['nullable', 'string', 'max:150'],
             'kecamatan' => ['nullable', 'string', 'max:150'],
-            'keywords' => ['nullable', 'string', 'max:255'],
 
             'min_rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
-            'top_n' => ['required', 'integer', 'min:1', 'max:50'],
 
             'weather' => [
                 'nullable',
                 Rule::in(['cerah', 'hujan', 'mendung', 'berawan', 'unknown']),
             ],
 
-            'visit_day' => [
-                'nullable',
-                Rule::in(['weekday', 'weekend']),
-            ],
-
-            'is_high_season' => ['nullable', 'boolean'],
             'use_bmkg' => ['nullable', 'boolean'],
             'bmkg_adm4' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $payload = $this->buildPayload($validated);
+        /*
+        |--------------------------------------------------------------------------
+        | CODE MATI - validasi input rekomendasi lama
+        |--------------------------------------------------------------------------
+        |
+        | Field kategori_preferensi, keywords, top_n, visit_day, dan
+        | is_high_season tidak lagi ditampilkan pada form awal sesuai revisi
+        | penguji. Potongan aturan lama disimpan sebagai code mati.
+        |
+        | 'kategori_preferensi' => ['required', 'array', 'min:1'],
+        | 'kategori_preferensi.*' => [
+        |     'required',
+        |     Rule::in(['Alam', 'Budaya', 'Rekreasi', 'Umum']),
+        | ],
+        | 'keywords' => ['nullable', 'string', 'max:255'],
+        | 'top_n' => ['required', 'integer', 'min:1', 'max:50'],
+        | 'visit_day' => ['nullable', Rule::in(['weekday', 'weekend'])],
+        | 'is_high_season' => ['nullable', 'boolean'],
+        |
+        */
 
         $startedAt = microtime(true);
+
+        $payload = $this->buildPayload($validated);
+
+        if (! $payload['use_bmkg'] || ! $payload['bmkg_adm4']) {
+            $this->storeFailedLog(
+                payload: $payload,
+                errorMessage: self::SERVICE_UNAVAILABLE_MESSAGE,
+                responseTimeMs: $this->calculateResponseTime($startedAt),
+            );
+
+            return redirect()
+                ->route('tourhub.recommendation.index')
+                ->with('error', self::SERVICE_UNAVAILABLE_MESSAGE);
+        }
 
         try {
             $result = $ml->recommend($payload);
 
             $responseTimeMs = $this->calculateResponseTime($startedAt);
+
+            /*
+             * FastAPI mempunyai fallback cuaca cerah ketika BMKG gagal. Pada
+             * revisi terbaru fallback tersebut tidak boleh ditampilkan sebagai
+             * rekomendasi valid. Laravel memeriksa bukti konteks BMKG sebelum
+             * menyimpan hasil sukses dan menampilkannya kepada user.
+             */
+            if (! $this->hasUsableBmkgContext($result)) {
+                $this->storeFailedLog(
+                    payload: $payload,
+                    errorMessage: self::SERVICE_UNAVAILABLE_MESSAGE,
+                    responseTimeMs: $responseTimeMs,
+                );
+
+                return redirect()
+                    ->route('tourhub.recommendation.index')
+                    ->with('error', self::SERVICE_UNAVAILABLE_MESSAGE);
+            }
 
             $log = $this->storeSuccessLog(
                 payload: $payload,
@@ -167,13 +226,28 @@ final class RecommendationController extends Controller
                 responseTimeMs: $responseTimeMs,
             );
 
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'ml_api' => $e->getMessage(),
-                ]);
+            return redirect()
+                ->route('tourhub.recommendation.index')
+                ->with('error', self::SERVICE_UNAVAILABLE_MESSAGE);
         }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CODE MATI - response error rekomendasi lama
+    |--------------------------------------------------------------------------
+    |
+    | Response lama menampilkan pesan exception mentah dan mempertahankan input.
+    | Sekarang user dikembalikan ke halaman utama rekomendasi dengan pesan umum
+    | agar kegagalan BMKG/ML tidak dianggap sebagai hasil rekomendasi yang valid.
+    |
+    | return back()
+    |     ->withInput()
+    |     ->withErrors([
+    |         'ml_api' => $e->getMessage(),
+    |     ]);
+    |
+    */
 
     /**
      * Data default untuk view.
@@ -198,14 +272,136 @@ final class RecommendationController extends Controller
     }
 
     /**
+     * Menyiapkan filter tipe wisata dan pagination setelah rekomendasi selesai.
+     *
+     * Seluruh proses ini dilakukan di Laravel terhadap snapshot response yang
+     * sudah tersimpan. Memilih filter atau halaman tidak memanggil FastAPI dan
+     * BMKG ulang.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildResultViewData(Request $request, RecommendationLog $log): array
+    {
+        $result = is_array($log->response_payload) ? $log->response_payload : [];
+
+        $allRecommendations = collect(data_get($result, 'recommendations', []))
+            ->sortByDesc(fn (mixed $item): float => (float) data_get($item, 'final_score', 0))
+            ->values();
+
+        $resultTypeFilter = mb_strtolower(mb_trim((string) $request->query('tipe_wisata', 'all')));
+
+        if (! in_array($resultTypeFilter, self::RESULT_TYPE_FILTERS, true)) {
+            $resultTypeFilter = 'all';
+        }
+
+        $resultTypeCounts = [
+            'all' => $allRecommendations->count(),
+            'outdoor' => $allRecommendations
+                ->filter(fn (mixed $item): bool => $this->normalizeTourismType(data_get($item, 'tipe_wisata')) === 'outdoor')
+                ->count(),
+            'indoor' => $allRecommendations
+                ->filter(fn (mixed $item): bool => $this->normalizeTourismType(data_get($item, 'tipe_wisata')) === 'indoor')
+                ->count(),
+            'mixed' => $allRecommendations
+                ->filter(fn (mixed $item): bool => $this->normalizeTourismType(data_get($item, 'tipe_wisata')) === 'mixed')
+                ->count(),
+        ];
+
+        $filteredRecommendations = $resultTypeFilter === 'all'
+            ? $allRecommendations
+            : $allRecommendations
+                ->filter(
+                    fn (mixed $item): bool => $this->normalizeTourismType(data_get($item, 'tipe_wisata')) === $resultTypeFilter
+                )
+                ->values();
+
+        $lastPage = max(
+            1,
+            (int) ceil($filteredRecommendations->count() / self::RECOMMENDATIONS_PER_PAGE)
+        );
+
+        $currentPage = min(
+            max(1, $request->integer('page', 1)),
+            $lastPage
+        );
+
+        $recommendations = new LengthAwarePaginator(
+            items: $filteredRecommendations
+                ->forPage($currentPage, self::RECOMMENDATIONS_PER_PAGE)
+                ->values(),
+            total: $filteredRecommendations->count(),
+            perPage: self::RECOMMENDATIONS_PER_PAGE,
+            currentPage: $currentPage,
+            options: [
+                'path' => route('tourhub.recommendation.index'),
+                'pageName' => 'page',
+            ],
+        );
+
+        $recommendations->appends(array_filter([
+            'log' => $log->id,
+            'tipe_wisata' => $resultTypeFilter !== 'all' ? $resultTypeFilter : null,
+        ], fn (mixed $value): bool => $value !== null && $value !== ''));
+
+        return [
+            'recommendations' => $recommendations,
+            'bestRecommendation' => $filteredRecommendations->first(),
+            'recommendationTotal' => $allRecommendations->count(),
+            'filteredRecommendationTotal' => $filteredRecommendations->count(),
+            'resultTypeFilter' => $resultTypeFilter,
+            'resultTypeCounts' => $resultTypeCounts,
+        ];
+    }
+
+    /**
+     * Memastikan response rekomendasi benar-benar membawa prakiraan BMKG.
+     *
+     * Fallback FastAPI memiliki forecast_slots_checked=0. Kondisi tersebut
+     * dianggap BMKG tidak tersedia dan hasil tidak ditampilkan kepada user.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function hasUsableBmkgContext(array $result): bool
+    {
+        $weatherSource = mb_strtolower(mb_trim((string) data_get($result, 'weather_source', '')));
+        $forecastSlotsChecked = (int) data_get($result, 'query.bmkg_context.forecast_slots_checked', 0);
+        $weatherDescription = mb_trim((string) data_get($result, 'query.bmkg_context.weather_desc', ''));
+        $isFallback = filter_var(
+            data_get($result, 'query.bmkg_context.weather_is_fallback', false),
+            FILTER_VALIDATE_BOOLEAN
+        );
+
+        return str_starts_with($weatherSource, 'bmkg adm4=')
+            && $forecastSlotsChecked > 0
+            && $weatherDescription !== ''
+            && ! $isFallback;
+    }
+
+    private function normalizeTourismType(mixed $value): string
+    {
+        $type = mb_strtolower(mb_trim((string) $value));
+
+        return in_array($type, ['outdoor', 'indoor', 'mixed'], true)
+            ? $type
+            : 'mixed';
+    }
+
+    /**
      * Membentuk payload yang akan dikirim ke FastAPI ML.
+     *
+     * REVISI FORM REKOMENDASI:
+     * - Kategori tidak lagi dipilih sebelum rekomendasi.
+     * - Keyword tidak lagi dipakai.
+     * - Jumlah hasil selalu memakai batas maksimal FastAPI dan dipaginasi di web.
+     * - Hari kunjungan tidak ditampilkan dan selalu memakai default weekend.
+     * - Musim ramai selalu nonaktif.
      *
      * PERBAIKAN BMKG OTOMATIS:
      * - Cuaca manual tidak lagi dijadikan input utama.
      * - Weather selalu dikirim sebagai fallback default: "cerah".
      * - Controller otomatis mencari kode ADM4 dari lokasi yang dipilih.
      * - Jika ADM4 ditemukan, FastAPI akan memakai BMKG sebagai konteks cuaca.
-     * - Jika suatu saat ADM4 gagal ditemukan, sistem tetap aman dengan fallback cerah.
+     * - Jika ADM4 gagal ditemukan/diakses, rekomendasi dihentikan oleh controller.
      *
      * Catatan:
      * Logic lama TIDAK DIHAPUS. Logic lama disimpan sebagai CODE MATI
@@ -225,35 +421,27 @@ final class RecommendationController extends Controller
          * BMKG OTOMATIS UNTUK WEB
          *
          * Alur:
-         * 1. Jika request membawa bmkg_adm4, pakai nilai tersebut.
-         * 2. Jika kosong, cari otomatis dari kabupaten/kota + kecamatan.
-         * 3. Jika masih kosong, sistem tetap jalan dengan use_bmkg=false
-         *    dan weather fallback "cerah".
-         *
-         * Pada controller ini resolveBmkgAdm4() sudah memiliki fallback
-         * terakhir DEFAULT_BALI_ADM4, sehingga normalnya bmkg_adm4 tetap terisi.
+         * ADM4 selalu ditentukan ulang dari lokasi oleh server. Hidden input lama
+         * tetap diterima untuk backward compatibility, tetapi tidak dipercaya
+         * sebagai sumber utama agar kode wilayah tidak dapat dimanipulasi user.
          */
-        $bmkgAdm4 = $this->nullableString($validated['bmkg_adm4'] ?? null);
-
-        if (! $bmkgAdm4) {
-            $bmkgAdm4 = $this->resolveBmkgAdm4($validated);
-        }
+        $bmkgAdm4 = $this->resolveRequiredBmkgAdm4($validated);
 
         $useBmkg = $bmkgAdm4 !== null && $bmkgAdm4 !== '';
 
         return [
-            'kategori_preferensi' => $validated['kategori_preferensi'],
+            'kategori_preferensi' => [],
 
             'kabupaten_kota' => $kabupatenKota,
             'kecamatan' => $kecamatan,
 
-            'keywords' => $this->parseKeywords($validated['keywords'] ?? null),
+            'keywords' => [],
 
             'min_rating' => isset($validated['min_rating'])
                 ? (float) $validated['min_rating']
                 : null,
 
-            'top_n' => (int) $validated['top_n'],
+            'top_n' => self::RECOMMENDATION_FETCH_LIMIT,
 
             /*
              * Weather hanya fallback.
@@ -263,9 +451,17 @@ final class RecommendationController extends Controller
              */
             'weather' => 'cerah',
 
-            'visit_day' => $this->nullableString($validated['visit_day'] ?? null),
+            /*
+             * Hari kunjungan tidak lagi ditampilkan pada form. Nilai weekend
+             * ditetapkan dari server agar konteks CARS tetap berjalan dan tidak
+             * dapat diubah melalui manipulasi request.
+             *
+             * CODE MATI nilai lama:
+             * 'visit_day' => $this->nullableString($validated['visit_day'] ?? null),
+             */
+            'visit_day' => 'weekend',
 
-            'is_high_season' => $this->toBoolean($validated['is_high_season'] ?? false),
+            'is_high_season' => false,
 
             /*
              * BMKG otomatis aktif selama ADM4 berhasil tersedia.
@@ -273,6 +469,34 @@ final class RecommendationController extends Controller
             'use_bmkg' => $useBmkg,
             'bmkg_adm4' => $useBmkg ? $bmkgAdm4 : null,
         ];
+    }
+
+    /**
+     * Mengambil satu kode ADM4 paling relevan dan memvalidasinya satu kali.
+     *
+     * Berbeda dengan resolver lama yang dapat melakukan scan puluhan kandidat,
+     * resolver ini fail-fast agar user segera kembali ke halaman utama ketika
+     * BMKG sedang down atau kode lokasi tidak tersedia.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function resolveRequiredBmkgAdm4(array $validated): ?string
+    {
+        $kabupatenKota = $this->normalizeKabupatenKota(
+            $this->normalizeLocation($validated['kabupaten_kota'] ?? null)
+        );
+
+        $kecamatan = $this->normalizeLocation($validated['kecamatan'] ?? null);
+
+        $candidate = $this->resolveManualBmkgAdm4(
+            kabupatenKota: $kabupatenKota,
+            kecamatan: $kecamatan,
+        )
+            ?? $this->resolveBmkgAdm4ByKecamatanOnly($kecamatan)
+            ?? $this->resolveFallbackBmkgAdm4ByKabupaten($kabupatenKota)
+            ?? self::DEFAULT_BALI_ADM4;
+
+        return $this->resolveValidatedAdm4Candidate($candidate);
     }
 
     /*
@@ -357,6 +581,8 @@ final class RecommendationController extends Controller
      * 4. Resolve dari ADM3 BMKG melalui halaman BMKG.
      * 5. Scan kandidat ADM4 umum dari ADM3.
      * 6. Fallback terakhir ke Ubud agar tidak error.
+     *
+     * @deprecated CODE MATI. Alur aktif memakai resolveRequiredBmkgAdm4() yang fail-fast.
      *
      * @param  array<string, mixed>  $validated
      */
@@ -530,10 +756,10 @@ final class RecommendationController extends Controller
     private function resolveManualBmkgAdm4(string $kabupatenKota, string $kecamatan): ?string
     {
         $map = [
-            'kabupaten jembrana|negara' => '51.01.01.1001',
+            'kabupaten jembrana|negara' => '51.01.01.1006', // CODE MATI nilai lama: '51.01.01.1001' (404 BMKG)
             'kabupaten jembrana|mendoyo' => '51.01.02.2001',
             'kabupaten jembrana|pekutatan' => '51.01.03.2001',
-            'kabupaten jembrana|melaya' => '51.01.04.2001',
+            'kabupaten jembrana|melaya' => '51.01.04.1001', // CODE MATI nilai lama: '51.01.04.2001' (404 BMKG)
             'kabupaten jembrana|jembrana' => '51.01.05.1001',
 
             'kabupaten tabanan|selemadeg' => '51.02.01.2001',
@@ -551,12 +777,12 @@ final class RecommendationController extends Controller
             'kabupaten badung|mengwi' => '51.03.02.2001',
             'kabupaten badung|abiansemal' => '51.03.03.2001',
             'kabupaten badung|petang' => '51.03.04.2001',
-            'kabupaten badung|kuta selatan' => '51.03.05.1001',
+            'kabupaten badung|kuta selatan' => '51.03.05.1004', // CODE MATI nilai lama: '51.03.05.1001' (404 BMKG)
             'kabupaten badung|kuta utara' => '51.03.06.1001',
 
             'kabupaten gianyar|sukawati' => '51.04.01.2001',
             'kabupaten gianyar|blahbatuh' => '51.04.02.2001',
-            'kabupaten gianyar|gianyar' => '51.04.03.1001',
+            'kabupaten gianyar|gianyar' => '51.04.03.1003', // CODE MATI nilai lama: '51.04.03.1001' (404 BMKG)
             'kabupaten gianyar|tampaksiring' => '51.04.04.2001',
             'kabupaten gianyar|ubud' => '51.04.05.1005',
             'kabupaten gianyar|tegallalang' => '51.04.06.2001',
@@ -565,37 +791,37 @@ final class RecommendationController extends Controller
 
             'kabupaten klungkung|nusa penida' => '51.05.01.2001',
             'kabupaten klungkung|banjarangkan' => '51.05.02.2001',
-            'kabupaten klungkung|klungkung' => '51.05.03.1001',
+            'kabupaten klungkung|klungkung' => '51.05.03.1008', // CODE MATI nilai lama: '51.05.03.1001' (404 BMKG)
             'kabupaten klungkung|dawan' => '51.05.04.2001',
 
             'kabupaten bangli|susut' => '51.06.01.2001',
-            'kabupaten bangli|bangli' => '51.06.02.1001',
+            'kabupaten bangli|bangli' => '51.06.02.1003', // CODE MATI nilai lama: '51.06.02.1001' (404 BMKG)
             'kabupaten bangli|tembuku' => '51.06.03.2001',
             'kabupaten bangli|kintamani' => '51.06.04.2001',
 
             'kabupaten karangasem|rendang' => '51.07.01.2001',
             'kabupaten karangasem|sidemen' => '51.07.02.2001',
             'kabupaten karangasem|manggis' => '51.07.03.2001',
-            'kabupaten karangasem|karangasem' => '51.07.04.1001',
+            'kabupaten karangasem|karangasem' => '51.07.04.1002', // CODE MATI nilai lama: '51.07.04.1001' (404 BMKG)
             'kabupaten karangasem|abang' => '51.07.05.2001',
             'kabupaten karangasem|bebandem' => '51.07.06.2001',
             'kabupaten karangasem|selat' => '51.07.07.2001',
             'kabupaten karangasem|kubu' => '51.07.08.2001',
 
             'kabupaten buleleng|gerokgak' => '51.08.01.2001',
-            'kabupaten buleleng|seririt' => '51.08.02.1001',
+            'kabupaten buleleng|seririt' => '51.08.02.1015', // CODE MATI nilai lama: '51.08.02.1001' (404 BMKG)
             'kabupaten buleleng|busungbiu' => '51.08.03.2001',
             'kabupaten buleleng|banjar' => '51.08.04.2001',
             'kabupaten buleleng|sukasada' => '51.08.05.2001',
-            'kabupaten buleleng|buleleng' => '51.08.06.1001',
+            'kabupaten buleleng|buleleng' => '51.08.06.1006', // CODE MATI nilai lama: '51.08.06.1001' (404 BMKG)
             'kabupaten buleleng|sawan' => '51.08.07.2001',
             'kabupaten buleleng|kubutambahan' => '51.08.08.2001',
             'kabupaten buleleng|tejakula' => '51.08.09.2001',
 
             'kota denpasar|denpasar selatan' => '51.71.01.1006',
-            'kota denpasar|denpasar timur' => '51.71.02.1001',
-            'kota denpasar|denpasar barat' => '51.71.03.1001',
-            'kota denpasar|denpasar utara' => '51.71.04.1001',
+            'kota denpasar|denpasar timur' => '51.71.02.1003', // CODE MATI nilai lama: '51.71.02.1001' (404 BMKG)
+            'kota denpasar|denpasar barat' => '51.71.03.1005', // CODE MATI nilai lama: '51.71.03.1001' (404 BMKG)
+            'kota denpasar|denpasar utara' => '51.71.04.1004', // CODE MATI nilai lama: '51.71.04.1001' (404 BMKG)
         ];
 
         $key = $kabupatenKota.'|'.$kecamatan;
@@ -613,10 +839,10 @@ final class RecommendationController extends Controller
         }
 
         $map = [
-            'negara' => '51.01.01.1001',
+            'negara' => '51.01.01.1006', // CODE MATI nilai lama: '51.01.01.1001' (404 BMKG)
             'mendoyo' => '51.01.02.2001',
             'pekutatan' => '51.01.03.2001',
-            'melaya' => '51.01.04.2001',
+            'melaya' => '51.01.04.1001', // CODE MATI nilai lama: '51.01.04.2001' (404 BMKG)
             'jembrana' => '51.01.05.1001',
 
             'selemadeg' => '51.02.01.2001',
@@ -634,12 +860,12 @@ final class RecommendationController extends Controller
             'mengwi' => '51.03.02.2001',
             'abiansemal' => '51.03.03.2001',
             'petang' => '51.03.04.2001',
-            'kuta selatan' => '51.03.05.1001',
+            'kuta selatan' => '51.03.05.1004', // CODE MATI nilai lama: '51.03.05.1001' (404 BMKG)
             'kuta utara' => '51.03.06.1001',
 
             'sukawati' => '51.04.01.2001',
             'blahbatuh' => '51.04.02.2001',
-            'gianyar' => '51.04.03.1001',
+            'gianyar' => '51.04.03.1003', // CODE MATI nilai lama: '51.04.03.1001' (404 BMKG)
             'tampaksiring' => '51.04.04.2001',
             'ubud' => '51.04.05.1005',
             'tegallalang' => '51.04.06.2001',
@@ -648,37 +874,37 @@ final class RecommendationController extends Controller
 
             'nusa penida' => '51.05.01.2001',
             'banjarangkan' => '51.05.02.2001',
-            'klungkung' => '51.05.03.1001',
+            'klungkung' => '51.05.03.1008', // CODE MATI nilai lama: '51.05.03.1001' (404 BMKG)
             'dawan' => '51.05.04.2001',
 
             'susut' => '51.06.01.2001',
-            'bangli' => '51.06.02.1001',
+            'bangli' => '51.06.02.1003', // CODE MATI nilai lama: '51.06.02.1001' (404 BMKG)
             'tembuku' => '51.06.03.2001',
             'kintamani' => '51.06.04.2001',
 
             'rendang' => '51.07.01.2001',
             'sidemen' => '51.07.02.2001',
             'manggis' => '51.07.03.2001',
-            'karangasem' => '51.07.04.1001',
+            'karangasem' => '51.07.04.1002', // CODE MATI nilai lama: '51.07.04.1001' (404 BMKG)
             'abang' => '51.07.05.2001',
             'bebandem' => '51.07.06.2001',
             'selat' => '51.07.07.2001',
             'kubu' => '51.07.08.2001',
 
             'gerokgak' => '51.08.01.2001',
-            'seririt' => '51.08.02.1001',
+            'seririt' => '51.08.02.1015', // CODE MATI nilai lama: '51.08.02.1001' (404 BMKG)
             'busungbiu' => '51.08.03.2001',
             'banjar' => '51.08.04.2001',
             'sukasada' => '51.08.05.2001',
-            'buleleng' => '51.08.06.1001',
+            'buleleng' => '51.08.06.1006', // CODE MATI nilai lama: '51.08.06.1001' (404 BMKG)
             'sawan' => '51.08.07.2001',
             'kubutambahan' => '51.08.08.2001',
             'tejakula' => '51.08.09.2001',
 
             'denpasar selatan' => '51.71.01.1006',
-            'denpasar timur' => '51.71.02.1001',
-            'denpasar barat' => '51.71.03.1001',
-            'denpasar utara' => '51.71.04.1001',
+            'denpasar timur' => '51.71.02.1003', // CODE MATI nilai lama: '51.71.02.1001' (404 BMKG)
+            'denpasar barat' => '51.71.03.1005', // CODE MATI nilai lama: '51.71.03.1001' (404 BMKG)
+            'denpasar utara' => '51.71.04.1004', // CODE MATI nilai lama: '51.71.04.1001' (404 BMKG)
         ];
 
         return $map[$kecamatan] ?? null;
@@ -691,14 +917,14 @@ final class RecommendationController extends Controller
     private function resolveFallbackBmkgAdm4ByKabupaten(string $kabupatenKota): ?string
     {
         $map = [
-            'kabupaten jembrana' => '51.01.01.1001',
+            'kabupaten jembrana' => '51.01.01.1006', // CODE MATI nilai lama: '51.01.01.1001' (404 BMKG)
             'kabupaten tabanan' => '51.02.05.2001', // CODE MATI nilai lama: '51.02.05.1001' (404 BMKG)
             'kabupaten badung' => '51.03.01.1001',
             'kabupaten gianyar' => '51.04.05.1005',
-            'kabupaten klungkung' => '51.05.03.1001',
-            'kabupaten bangli' => '51.06.02.1001',
-            'kabupaten karangasem' => '51.07.04.1001',
-            'kabupaten buleleng' => '51.08.06.1001',
+            'kabupaten klungkung' => '51.05.03.1008', // CODE MATI nilai lama: '51.05.03.1001' (404 BMKG)
+            'kabupaten bangli' => '51.06.02.1003', // CODE MATI nilai lama: '51.06.02.1001' (404 BMKG)
+            'kabupaten karangasem' => '51.07.04.1002', // CODE MATI nilai lama: '51.07.04.1001' (404 BMKG)
+            'kabupaten buleleng' => '51.08.06.1006', // CODE MATI nilai lama: '51.08.06.1001' (404 BMKG)
             'kota denpasar' => '51.71.01.1006',
         ];
 
@@ -911,7 +1137,7 @@ final class RecommendationController extends Controller
      * - dan hasil scan kandidat.
      *
      * Catatan:
-     * Cache key memakai versi v2 agar tidak bentrok dengan hasil cache lama.
+     * Cache key memakai versi v3 agar tidak bentrok dengan hasil cache lama.
      * Hasil valid disimpan lebih lama, sedangkan hasil invalid disimpan lebih
      * pendek supaya jika BMKG sempat error sementara, sistem tidak terkunci
      * terlalu lama pada status invalid.
@@ -924,7 +1150,7 @@ final class RecommendationController extends Controller
             return false;
         }
 
-        $cacheKey = 'bmkg_adm4_valid_v2_'.str_replace('.', '_', $adm4);
+        $cacheKey = 'bmkg_adm4_valid_v3_'.str_replace('.', '_', $adm4);
 
         $cached = Cache::get($cacheKey);
 
@@ -933,19 +1159,24 @@ final class RecommendationController extends Controller
         }
 
         try {
-            $response = Http::timeout(8)
+            $response = Http::connectTimeout(3)
+                ->timeout(5)
                 ->acceptJson()
                 ->get('https://api.bmkg.go.id/publik/prakiraan-cuaca', [
                     'adm4' => $adm4,
                 ]);
         } catch (Throwable) {
-            Cache::put($cacheKey, false, now()->addHours(6));
+            Cache::put($cacheKey, false, now()->addMinute());
 
             return false;
         }
 
         if (! $response->successful()) {
-            Cache::put($cacheKey, false, now()->addHours(12));
+            Cache::put(
+                $cacheKey,
+                false,
+                $response->serverError() ? now()->addMinute() : now()->addHours(12)
+            );
 
             return false;
         }
@@ -953,13 +1184,13 @@ final class RecommendationController extends Controller
         try {
             $json = $response->json();
         } catch (Throwable) {
-            Cache::put($cacheKey, false, now()->addHours(12));
+            Cache::put($cacheKey, false, now()->addMinutes(5));
 
             return false;
         }
 
         if (! is_array($json)) {
-            Cache::put($cacheKey, false, now()->addHours(12));
+            Cache::put($cacheKey, false, now()->addMinutes(5));
 
             return false;
         }
@@ -987,9 +1218,9 @@ final class RecommendationController extends Controller
     | - Jika API BMKG sedang error sementara, hasil false bisa tersimpan terlalu lama.
     |
     | Sekarang:
-    | - Cache key dibuat versi v2.
+    | - Cache key dibuat versi v3.
     | - Hasil valid disimpan 30 hari.
-    | - Hasil invalid hanya disimpan 6-12 jam agar bisa pulih otomatis saat BMKG kembali normal.
+    | - Kode invalid disimpan 12 jam, sedangkan gangguan sementara hanya 1-5 menit.
     |
     | Potongan logic lama yang dimatikan:
     |
@@ -1175,6 +1406,8 @@ final class RecommendationController extends Controller
      * Contoh:
      * "pantai, sunset" menjadi ["pantai", "sunset"]
      *
+     * @deprecated CODE MATI. Kata kunci tidak lagi digunakan pada form rekomendasi.
+     *
      * @return array<int, string>
      */
     private function parseKeywords(?string $keywords): array
@@ -1201,6 +1434,7 @@ final class RecommendationController extends Controller
         return $value === '' ? null : $value;
     }
 
+    /** @deprecated CODE MATI. Helper ini hanya dipakai buildPayload lama. */
     private function toBoolean(mixed $value): bool
     {
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
