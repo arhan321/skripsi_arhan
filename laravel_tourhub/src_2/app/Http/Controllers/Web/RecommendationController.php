@@ -57,7 +57,13 @@ final class RecommendationController extends Controller
      */
     private const RESULT_TYPE_FILTERS = ['all', 'outdoor', 'indoor', 'mixed'];
 
-    /** Pesan aman yang ditampilkan jika BMKG atau layanan rekomendasi bermasalah. */
+    /**
+     * PENANDA NOTIFIKASI GANGGUAN API/BMKG.
+     *
+     * Pesan ini sengaja dibuat umum agar detail exception, alamat API, dan
+     * konfigurasi server tidak bocor ke user. Pesan dikirim sebagai flash
+     * session `error`, lalu ditampilkan oleh alert pada Blade rekomendasi.
+     */
     private const SERVICE_UNAVAILABLE_MESSAGE = 'Sistem TourHub sedang tidak dapat digunakan karena layanan cuaca BMKG tidak terdeteksi atau sedang mengalami gangguan. Silakan coba lagi nanti.';
 
     public function index(Request $request): View
@@ -163,6 +169,17 @@ final class RecommendationController extends Controller
 
         $payload = $this->buildPayload($validated);
 
+        /*
+        |--------------------------------------------------------------------------
+        | PENANDA NOTIFIKASI 1 - ADM4/BMKG TIDAK DAPAT DIVALIDASI
+        |--------------------------------------------------------------------------
+        |
+        | Kondisi ini terjadi jika API BMKG down, timeout, mengembalikan HTTP
+        | error, JSON tidak valid, atau format lokasi/data BMKG berubah sehingga
+        | kode ADM4 tidak dapat dikenali. Request ke FastAPI dihentikan dan user
+        | dikembalikan ke halaman utama dengan flash session `error`.
+        |
+        */
         if (! $payload['use_bmkg'] || ! $payload['bmkg_adm4']) {
             $this->storeFailedLog(
                 payload: $payload,
@@ -181,10 +198,13 @@ final class RecommendationController extends Controller
             $responseTimeMs = $this->calculateResponseTime($startedAt);
 
             /*
-             * FastAPI mempunyai fallback cuaca cerah ketika BMKG gagal. Pada
-             * revisi terbaru fallback tersebut tidak boleh ditampilkan sebagai
-             * rekomendasi valid. Laravel memeriksa bukti konteks BMKG sebelum
-             * menyimpan hasil sukses dan menampilkannya kepada user.
+             * PENANDA NOTIFIKASI 2 - FORMAT RESPONSE BMKG/FASTAPI TIDAK SESUAI
+             *
+             * FastAPI mempunyai fallback cuaca cerah ketika BMKG gagal. Hasil
+             * fallback tersebut tidak boleh ditampilkan sebagai rekomendasi
+             * valid. Pemeriksaan ini juga menjadi pengaman jika nama/path field
+             * BMKG pada response berubah. Jika bukti konteks BMKG tidak lengkap,
+             * hasil ditolak dan flash session `error` dikirim ke Blade.
              */
             if (! $this->hasUsableBmkgContext($result)) {
                 $this->storeFailedLog(
@@ -218,6 +238,16 @@ final class RecommendationController extends Controller
                 ->route('tourhub.recommendation.index', ['log' => $log->id])
                 ->with('success', 'Rekomendasi berhasil dibuat.');
         } catch (Throwable $e) {
+            /*
+            |--------------------------------------------------------------------------
+            | PENANDA NOTIFIKASI 3 - EXCEPTION API REKOMENDASI
+            |--------------------------------------------------------------------------
+            |
+            | Menangkap seluruh kegagalan koneksi/timeout/HTTP/JSON dari layanan
+            | rekomendasi. Detail asli disimpan ke log untuk developer, sedangkan
+            | user menerima SERVICE_UNAVAILABLE_MESSAGE melalui session `error`.
+            |
+            */
             $responseTimeMs = $this->calculateResponseTime($startedAt);
 
             $this->storeFailedLog(
@@ -358,6 +388,9 @@ final class RecommendationController extends Controller
      *
      * Fallback FastAPI memiliki forecast_slots_checked=0. Kondisi tersebut
      * dianggap BMKG tidak tersedia dan hasil tidak ditampilkan kepada user.
+     * Jika suatu saat struktur response BMKG/FastAPI berubah dan salah satu
+     * path di bawah tidak ditemukan, nilai default membuat method mengembalikan
+     * false. Nilai false diteruskan ke PENANDA NOTIFIKASI 2 pada recommend().
      *
      * @param  array<string, mixed>  $result
      */
@@ -1141,6 +1174,11 @@ final class RecommendationController extends Controller
      * Hasil valid disimpan lebih lama, sedangkan hasil invalid disimpan lebih
      * pendek supaya jika BMKG sempat error sementara, sistem tidak terkunci
      * terlalu lama pada status invalid.
+     *
+     * PENANDA DETEKSI GANGGUAN BMKG:
+     * Semua return false pada method ini akan membuat resolveRequiredBmkgAdm4()
+     * mengembalikan null. Alur kemudian masuk ke PENANDA NOTIFIKASI 1 pada
+     * recommend(), sehingga user kembali ke halaman utama dan melihat alert.
      */
     private function isValidBmkgAdm4(string $adm4): bool
     {
@@ -1166,12 +1204,14 @@ final class RecommendationController extends Controller
                     'adm4' => $adm4,
                 ]);
         } catch (Throwable) {
+            // DETEKSI BMKG A: koneksi gagal atau timeout.
             Cache::put($cacheKey, false, now()->addMinute());
 
             return false;
         }
 
         if (! $response->successful()) {
+            // DETEKSI BMKG B: BMKG mengembalikan status HTTP non-2xx.
             Cache::put(
                 $cacheKey,
                 false,
@@ -1184,17 +1224,25 @@ final class RecommendationController extends Controller
         try {
             $json = $response->json();
         } catch (Throwable) {
+            // DETEKSI BMKG C: response tidak dapat di-decode sebagai JSON.
             Cache::put($cacheKey, false, now()->addMinutes(5));
 
             return false;
         }
 
         if (! is_array($json)) {
+            // DETEKSI BMKG D: tipe root JSON berubah dan bukan array/object.
             Cache::put($cacheKey, false, now()->addMinutes(5));
 
             return false;
         }
 
+        /*
+         * DETEKSI BMKG E: pengaman perubahan struktur response.
+         * Saat ini data dianggap valid jika path `lokasi` atau `data.0` ada.
+         * Jika BMKG mengganti kedua path tersebut, nilai menjadi false dan
+         * notifikasi gangguan ditampilkan melalui alur PENANDA NOTIFIKASI 1.
+         */
         $isValid = data_get($json, 'lokasi') !== null
             || data_get($json, 'data.0') !== null;
 

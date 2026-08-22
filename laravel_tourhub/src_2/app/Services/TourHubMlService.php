@@ -83,13 +83,30 @@ class TourHubMlService
                 default => throw new RuntimeException("Unsupported HTTP method: {$method}"),
             };
 
+            /*
+             * PENANDA ERROR FASTAPI A:
+             * Status HTTP non-2xx dijadikan exception. Exception diteruskan ke
+             * RecommendationController::recommend(), dicatat sebagai log gagal,
+             * lalu user menerima notifikasi aman di halaman utama TourHub.
+             */
             if ($response->failed()) {
                 $body = Str::limit($response->body(), 500);
                 throw new RuntimeException("ML API error HTTP {$response->status()}: {$body}");
             }
 
+            /*
+             * PENANDA ERROR FASTAPI B:
+             * Jika body bukan JSON atau struktur response berubah, nilai kosong
+             * akan ditolak oleh hasUsableBmkgContext() pada controller sehingga
+             * hasil tidak ditampilkan sebagai rekomendasi yang valid.
+             */
             return $response->json() ?? [];
         } catch (ConnectionException|RequestException $e) {
+            /*
+             * PENANDA ERROR FASTAPI C:
+             * Gangguan koneksi/timeout dibungkus menjadi RuntimeException agar
+             * ditangkap oleh controller dan diubah menjadi notifikasi TourHub.
+             */
             throw new RuntimeException('Gagal terhubung ke ML API: '.$e->getMessage(), 0, $e);
         }
     }

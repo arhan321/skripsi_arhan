@@ -1263,6 +1263,20 @@
                             </div>
 
                             <div class="p-5 md:p-6">
+                                {{--
+                                =====================================================================
+                                PENANDA NOTIFIKASI 4 - ALERT GANGGUAN API/BMKG YANG DILIHAT USER
+                                =====================================================================
+                                Controller mengisi session('error') pada tiga kondisi utama:
+                                1. API BMKG down/timeout/HTTP error atau ADM4 tidak dapat divalidasi.
+                                2. Format JSON BMKG/FastAPI berubah atau konteks cuaca tidak lengkap.
+                                3. FastAPI rekomendasi gagal dihubungi atau melempar exception.
+
+                                Alert ini berada di bagian atas form agar user langsung mengetahui
+                                bahwa TourHub sementara tidak dapat digunakan. Detail exception asli
+                                tidak ditampilkan kepada user dan hanya disimpan pada log kegagalan.
+                                =====================================================================
+                                --}}
                                 @if (session('error'))
                                     <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
                                         <div class="flex items-start gap-3">
